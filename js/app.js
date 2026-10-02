@@ -12,7 +12,7 @@ import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
 
 const TEACHER_NAV = [
-  ['today', '오늘', 'M3 12l9-8 9 8M5 10v10h14V10'],
+  ['today', '한눈에', 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z'],
   ['students', '학생·IEP', 'M12 12a4 4 0 100-8 4 4 0 000 8zm-7 9a7 7 0 0114 0'],
   ['behavior', '행동 기록', 'M12 3v18M3 12h18'],
   ['chat', '메신저', 'M4 5h16v11H8l-4 4z'],
@@ -23,7 +23,7 @@ const AIDE_NAV = [
   ['record', '기록하기', 'M12 3v18M3 12h18'],
   ['mine', '내 기록', 'M5 4h14v16H5zM8 9h8M8 13h8']
 ];
-const VIEWS = { today: Today, students: Students, student: Students, behavior: Behavior, chat: Chat, calendar: Cal, admin: Admin, record: Aide, mine: Aide };
+const VIEWS = { today: Today, tasks: { render: Today.renderTasks }, students: Students, student: Students, behavior: Behavior, chat: Chat, calendar: Cal, admin: Admin, record: Aide, mine: Aide };
 
 function parseRoute() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
