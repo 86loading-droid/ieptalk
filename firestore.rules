@@ -1,0 +1,103 @@
+rules_version = '2';
+// IEP톡 보안 규칙
+// 역할: admin(관리자 교사), teacher(교사), aide(보조인력)
+// 핵심: 메신저·일정·IEP는 교사만. 보조인력은 배정된 학생의 표적행동을 읽고, 자기가 저장한 행동 기록만 읽고 고친다.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function myEmail() { return request.auth.token.email.lower(); }
+    // config.js의 OWNER_EMAILS와 같게 유지
+    function isOwner() { return signedIn() && request.auth.token.email_verified == true && myEmail() in ['86loading@gmail.com', 'hschoi@uu.ac.kr']; }
+
+    match /schools/{s} {
+      function memberPath() { return /databases/$(database)/documents/schools/$(s)/members/$(request.auth.uid); }
+      function isMember() { return signedIn() && exists(memberPath()) && get(memberPath()).data.active == true; }
+      function role() { return get(memberPath()).data.role; }
+      function isTeacher() { return isMember() && role() in ['teacher', 'admin']; }
+      function isAdmin() { return isOwner() || (isMember() && role() == 'admin'); }
+      function isAide() { return isMember() && role() == 'aide'; }
+      function stu(sid) { return get(/databases/$(database)/documents/schools/$(s)/students/$(sid)).data; }
+      function assignedAide(sid) { return isAide() && request.auth.uid in stu(sid).aideUids; }
+      function onlyChanged(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+      // 학교 설정(학사일정, 경고 기준)
+      allow read: if isMember() || isOwner();
+      allow write: if isAdmin();
+
+      // 초대: 관리자가 이메일로 만든다. 본인은 자기 초대만 읽는다.
+      match /invites/{email} {
+        allow read: if isAdmin() || (signedIn() && email == myEmail());
+        allow write: if isAdmin();
+      }
+
+      // 구성원: 초대받은 본인이 처음 로그인할 때 초대와 같은 역할로만 만든다.
+      match /members/{uid} {
+        function invite() { return get(/databases/$(database)/documents/schools/$(s)/invites/$(myEmail())).data; }
+        allow read: if isMember() || (signedIn() && uid == request.auth.uid);
+        allow create: if signedIn() && uid == request.auth.uid
+          && request.resource.data.email == myEmail() && request.resource.data.active == true
+          && ((isOwner() && request.resource.data.role == 'admin')
+              || (exists(/databases/$(database)/documents/schools/$(s)/invites/$(myEmail())) && request.resource.data.role == invite().role));
+        allow update: if isAdmin() || (uid == request.auth.uid && onlyChanged(['name', 'lastSeen']));
+        allow delete: if isAdmin();
+      }
+
+      // 학생: 교사는 모두, 보조인력은 자기에게 배정된 학생만 읽는다.
+      match /students/{sid} {
+        allow read: if isTeacher() || (isAide() && request.auth.uid in resource.data.aideUids);
+        allow write: if isTeacher();
+
+        match /goals/{gid} { allow read, write: if isTeacher(); }
+        match /memos/{mid} { allow read, write: if isTeacher(); }
+        match /targets/{tid} {
+          allow read: if isTeacher() || assignedAide(sid);
+          allow write: if isTeacher();
+        }
+      }
+
+      // 행동 기록
+      match /bevents/{eid} {
+        allow read: if isTeacher() || (isAide() && resource.data.createdBy == request.auth.uid);
+        allow create: if request.resource.data.createdBy == request.auth.uid
+          && (isTeacher() || assignedAide(request.resource.data.studentId));
+        allow update: if isTeacher()
+          || (isAide() && resource.data.createdBy == request.auth.uid
+              && request.resource.data.createdBy == request.auth.uid
+              && request.resource.data.studentId == resource.data.studentId
+              && request.resource.data.targetId == resource.data.targetId);
+        allow delete: if isTeacher() || (isAide() && resource.data.createdBy == request.auth.uid);
+      }
+
+      // 메신저: 교사만, 참여한 방만
+      match /rooms/{rid} {
+        allow read: if isTeacher() && request.auth.uid in resource.data.memberUids;
+        allow create: if isTeacher() && request.auth.uid in request.resource.data.memberUids;
+        allow update: if isTeacher() && request.auth.uid in resource.data.memberUids;
+        allow delete: if isAdmin();
+        match /messages/{mid} {
+          function room() { return get(/databases/$(database)/documents/schools/$(s)/rooms/$(rid)).data; }
+          allow read: if isTeacher() && request.auth.uid in room().memberUids;
+          allow create: if isTeacher() && request.auth.uid in room().memberUids && request.resource.data.by == request.auth.uid;
+          allow update, delete: if isTeacher() && resource.data.by == request.auth.uid;
+        }
+      }
+
+      // 일정(회의·전화 예약): 교사 공유 달력. 예약자는 모두 고치고, 참석자는 자기 응답만 고친다.
+      match /meetings/{mid} {
+        allow read: if isTeacher();
+        allow create: if isTeacher() && request.resource.data.organizer == request.auth.uid;
+        allow update: if isTeacher() && (resource.data.organizer == request.auth.uid
+          || (request.auth.uid in resource.data.attendeeUids && onlyChanged(['attendees'])
+              && request.resource.data.attendees.diff(resource.data.attendees).affectedKeys().hasOnly([request.auth.uid])));
+        allow delete: if isTeacher() && resource.data.organizer == request.auth.uid;
+      }
+
+      // 할 일: 교사끼리
+      match /tasks/{tid} {
+        allow read, create: if isTeacher();
+        allow update, delete: if isTeacher() && (resource.data.assignee == request.auth.uid || resource.data.createdBy == request.auth.uid);
+      }
+    }
+  }
+}

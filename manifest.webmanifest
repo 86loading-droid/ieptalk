@@ -1,0 +1,12 @@
+{
+  "name": "IEP톡",
+  "short_name": "IEP톡",
+  "description": "현장 특수교사의 IEP·진전도·행동 기록과 교사 간 협업",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#2f5d8a",
+  "lang": "ko",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
