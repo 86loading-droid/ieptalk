@@ -80,6 +80,7 @@ function render() {
   const scrollers = {}; root.querySelectorAll('[data-keep-scroll]').forEach((el) => { scrollers[el.dataset.keepScroll] = { top: el.scrollTop, atEnd: el.scrollHeight - el.scrollTop - el.clientHeight < 40 }; });
   let html;
   try { html = view.render(S.route); } catch (e) { console.error(e); html = `<section class="card"><h2>화면을 그리지 못했습니다</h2><p>${esc(e.message)}</p></section>`; }
+  document.body.classList.add('signed-in');
   root.innerHTML = shell(html);
   root.querySelectorAll('[data-draft]').forEach((el) => { const v = S.drafts[el.dataset.draft]; if (v != null && el.value === '') el.value = v; });
   if (focusId) { const el = document.getElementById(focusId); if (el) { if (focusVal != null && el.type !== 'checkbox' && el.type !== 'radio') el.value = focusVal; el.focus({ preventScroll: true }); if (sel) try { el.setSelectionRange(...sel); } catch {} } }
@@ -135,6 +136,7 @@ function startGlobal() {
 /* 로그인 화면 */
 function loginScreen(status, err) {
   const root = $('#app');
+  document.body.classList.remove('signed-in');
   const demo = S.store.mode === 'demo';
   const msg = {
     noInvite: '이 구글 계정은 아직 초대되지 않았습니다. 관리자에게 이메일 주소로 초대를 요청하세요.',

@@ -37,8 +37,8 @@ async function makeFirebaseStore() {
   const app = fb.initializeApp(FIREBASE_CONFIG);
   const auth = fb.getAuth(app);
   let db;
-  try { db = fb.initializeFirestore(app, { localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }) }); }
-  catch { db = fb.getFirestore(app); }
+  try { db = fb.initializeFirestore(app, { ignoreUndefinedProperties: true, localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }) }); }
+  catch { db = fb.initializeFirestore(app, { ignoreUndefinedProperties: true }); }
   if (USE_EMULATOR) { fb.connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); fb.connectFirestoreEmulator(db, '127.0.0.1', 8080); }
   const store = { mode: 'firebase', me: null, user: null };
   const col = (kind, p) => fb.collection(db, pathOf(kind, p));
