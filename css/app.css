@@ -78,8 +78,8 @@ main:focus { outline: none; }
 .nav-item.on { color: var(--primary); font-weight: 700; }
 .badge { position: absolute; top: 4px; right: calc(50% - 22px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--danger); color: #fff; font-size: .7rem; display: grid; place-items: center; font-weight: 700; }
 @media (min-width: 900px) {
-  body { display: grid; grid-template-columns: 210px 1fr; grid-template-rows: auto 1fr; }
-  #app { display: contents; }
+  body.signed-in { display: grid; grid-template-columns: 210px 1fr; grid-template-rows: auto 1fr; }
+  body.signed-in #app { display: contents; }
   .topbar { grid-column: 1 / -1; }
   .sidenav { display: flex; flex-direction: column; gap: .2rem; padding: 1rem .6rem; position: sticky; top: 57px; align-self: start; }
   .sidenav .nav-item { flex-direction: row; justify-content: flex-start; gap: .7rem; padding: .6rem .8rem; border-radius: 10px; font-size: .95rem; min-height: 46px; }
