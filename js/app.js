@@ -143,7 +143,7 @@ function loginScreen(status, err) {
     inactive: '사용이 중지된 계정입니다. 관리자에게 문의하세요.',
     error: '로그인 정보를 확인하지 못했습니다. ' + (err?.message || '')
   }[status];
-  const demoUsers = demo ? S.store.users.map((u) => `<button type="button" class="user-pick" data-act="demo-login" data-uid="${u.uid}">${avatar(u.uid)}<span><b>${esc(u.name)}</b><small>${esc(u.title)} · ${ROLE_LABEL[u.role]}</small></span></button>`).join('') : '';
+  const demoUsers = demo ? S.store.users.map((u) => `<button type="button" class="user-pick" data-act="demo-login" data-uid="${u.uid}">${avatar(u.uid, '', u.name)}<span><b>${esc(u.name)}</b><small>${esc(u.title)} · ${ROLE_LABEL[u.role]}</small></span></button>`).join('') : '';
   root.innerHTML = `
   <main class="login" id="main">
     <div class="login-card">
