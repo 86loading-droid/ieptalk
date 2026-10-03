@@ -28,3 +28,15 @@ console.log('t3 sees alert(none)', await as('t3', 'SELECT id FROM alerts'));
 console.log('t2 ack own', await as('t2', "UPDATE alert_recipients SET ack_at=now() WHERE alert_id='al' RETURNING member_uid"));
 console.log('a1 sees alert(none)', await as('a1', 'SELECT id FROM alerts'));
 console.log('a1 targets', await as('a1', 'SELECT id FROM targets'));
+
+// 학사일정·개인 약속
+await db.exec(`RESET ROLE; INSERT INTO acad_events(id,school_id,title,d,end_d) VALUES ('ac','s','학예회','2026-11-13','2026-11-13');
+INSERT INTO appointments(id,school_id,title,d,start_time,end_time,created_by) VALUES ('ap','s','점심 약속','2026-10-06','12:30','13:10','t1');
+INSERT INTO appointment_members VALUES ('ap','t1'),('ap','t2');`);
+console.log('t3 sees acad', await as('t3', 'SELECT id FROM acad_events'));
+console.log('a1 sees acad(none)', await as('a1', 'SELECT id FROM acad_events'));
+console.log('t3 write acad(ERR or none)', await as('t3', "INSERT INTO acad_events(id,school_id,title,d,end_d) VALUES ('x','s','x','2026-01-01','2026-01-01') RETURNING id"));
+console.log('t2 sees appt', await as('t2', 'SELECT id FROM appointments'));
+console.log('t3 sees appt(none)', await as('t3', 'SELECT id FROM appointments'));
+console.log('t2 edit appt(none)', await as('t2', "UPDATE appointments SET title='x' WHERE id='ap' RETURNING id"));
+console.log('t1 edit appt', await as('t1', "UPDATE appointments SET title='점심' WHERE id='ap' RETURNING id"));
