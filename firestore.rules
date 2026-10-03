@@ -93,6 +93,17 @@ service cloud.firestore {
         allow delete: if isTeacher() && resource.data.organizer == request.auth.uid;
       }
 
+      // 알림 띠(전화 예약·긴급회의·공지): 받는 사람은 읽고, 자기 확인·삭제 표시만 바꾼다. 보낸 사람은 지울 수 있다.
+      match /alerts/{aid} {
+        allow read: if isTeacher() && (request.auth.uid in resource.data.to || resource.data.from == request.auth.uid);
+        allow create: if isTeacher() && request.resource.data.from == request.auth.uid
+          && request.resource.data.ack == {} && request.resource.data.hidden == {};
+        allow update: if isTeacher() && request.auth.uid in resource.data.to && onlyChanged(['ack', 'hidden'])
+          && request.resource.data.ack.diff(resource.data.ack).affectedKeys().hasOnly([request.auth.uid])
+          && request.resource.data.hidden.diff(resource.data.hidden).affectedKeys().hasOnly([request.auth.uid]);
+        allow delete: if isTeacher() && resource.data.from == request.auth.uid;
+      }
+
       // 할 일: 교사끼리
       match /tasks/{tid} {
         allow read, create: if isTeacher();
