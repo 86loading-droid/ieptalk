@@ -3,6 +3,7 @@ import { esc, toast } from '../util.js';
 import { S, on, rerender, ROLE_LABEL, avatar, teachers, aides } from '../state.js';
 import { demoSeed, defaultSchool } from '../store.js';
 import { confirmInline } from './record.js';
+import { botMembers } from './bots.js';
 
 const TITLES = ['특수학급 담임', '통합학급 담임', '교과 교사', '특수교육 부장', '교감', '교장', '특수교육실무사', '사회복무요원', '치료지원 담당'];
 
@@ -38,6 +39,13 @@ export function render() {
       <div class="row2"><label>근무시간 외 시작<input type="time" name="quietFrom" value="${esc(sc.quietFrom)}"></label><label>근무 시작<input type="time" name="quietTo" value="${esc(sc.quietTo)}"></label></div>
       <button type="submit" class="primary">저장</button>
     </form>
+  </section>
+  <section class="card"><h2 class="h3">시험용 봇 교사</h2>
+    <p class="small">로그인하지 않는 시험용 교사입니다. 봇에게 공지·예약·메시지를 보내면 몇 초 뒤 자동으로 답하고, 아래 버튼으로 봇이 나에게 알림을 보내게 할 수 있습니다.</p>
+    ${botMembers().length ? `<ul class="rows">${botMembers().map((b) => `<li><span class="grow"><b>${esc(b.name)}</b> <small class="muted">${esc(b.title || '')}</small><br>
+      <span class="btns"><button type="button" class="sm notice-btn" data-act="bot-send" data-bot="${b.id}" data-type="urgent">나에게 긴급회의 공지</button><button type="button" class="sm ghost" data-act="bot-send" data-bot="${b.id}" data-type="call">나에게 전화 예약</button><button type="button" class="sm ghost" data-act="bot-send" data-bot="${b.id}" data-type="notice">나에게 일반 공지</button></span></span></li>`).join('')}</ul>
+      <button type="button" class="ghost sm danger" data-act="bots-remove">봇 지우기</button>`
+    : '<button type="button" class="primary" data-act="bots-create">봇 교사 2명 만들기</button>'}
   </section>
   <section class="card"><h2 class="h3">시연 자료</h2>
     <p class="small">가상 학생 3명(가명), IEP 목표, 표적행동, 기초선 기록을 넣습니다. 지금 구성원 중 교사·보조인력이 팀과 기록 담당으로 자동 배정됩니다.</p>

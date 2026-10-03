@@ -3,6 +3,7 @@
 import { esc, todayStr, timeStr, fmtDate, relTime, openModal, toast, addDays } from '../util.js';
 import { S, on, go, teachers, nameOf, isTeacher } from '../state.js';
 import { ensureRoom, postMessage } from './chat.js';
+import { autoRespond } from './bots.js';
 
 export const ALERT_TYPES = {
   urgent: { label: '긴급회의', cls: 'urgent' },
@@ -15,7 +16,9 @@ export const ALERT_TYPES = {
 export async function sendAlert({ type, title, text, to, roomId = '', meetingId = '' }) {
   const recipients = [...new Set(to)].filter((u) => u && u !== S.me.uid);
   if (!recipients.length) return null;
-  return S.store.create('alerts', {}, { type, title, text, from: S.me.uid, to: recipients, at: Date.now(), roomId, meetingId, ack: {}, hidden: {} });
+  const id = await S.store.create('alerts', {}, { type, title, text, from: S.me.uid, to: recipients, at: Date.now(), roomId, meetingId, ack: {}, hidden: {} });
+  autoRespond({ to: recipients, roomId, meetingId });
+  return id;
 }
 
 // 화면 맨 위 알림 띠

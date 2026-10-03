@@ -2,6 +2,7 @@
 import { esc, relTime, fmtDate, todayStr, addDays, toMs, openModal, toast, timeStr } from '../util.js';
 import { S, on, rerender, useSub, go, teachers, nameOf, avatar, student, member } from '../state.js';
 import { openMeetingModal, meetingCard } from './calendar.js';
+import { autoRespond } from './bots.js';
 
 export function roomTitle(r) {
   if (r.type === 'dm') return nameOf((r.memberUids || []).find((u) => u !== S.me.uid) || S.me.uid);
@@ -152,6 +153,7 @@ async function send(form, at) {
   const text = ta.value.trim(); if (!text) return;
   ta.value = ''; S.drafts['cmp-' + rid] = '';
   await postMessage(rid, { text, at });
+  if (!at) autoRespond({ to: S.rooms.find((r) => r.id === rid)?.memberUids || [], roomId: rid, kind: 'chat' });
   if (at) toast(`예약 전송: ${new Date(at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`);
 }
 document.addEventListener('submit', (e) => { const f = e.target.closest('.composer'); if (f) { e.preventDefault(); send(f).catch((err) => toast('보내지 못했습니다: ' + err.message)); } });
