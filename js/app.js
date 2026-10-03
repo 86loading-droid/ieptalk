@@ -10,6 +10,7 @@ import * as Chat from './views/chat.js';
 import * as Cal from './views/calendar.js';
 import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
+import { alertsBar } from './views/alerts.js';
 
 const TEACHER_NAV = [
   ['today', '한눈에', 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z'],
@@ -59,6 +60,7 @@ function shell(content) {
       <button type="button" class="ghost sm" data-act="signout">${S.store.mode === 'demo' ? '사용자 바꾸기' : '로그아웃'}</button>
     </div>
   </header>
+  ${alertsBar()}
   <nav class="sidenav" aria-label="주 메뉴">${links}</nav>
   <main id="main" tabindex="-1">${content}</main>
   <nav class="tabbar" aria-label="주 메뉴(하단)">${links}</nav>`;
@@ -127,6 +129,7 @@ function startGlobal() {
     st.sub('rooms', {}, (r) => { S.rooms = r.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)); rerender(); });
     st.sub('meetings', {}, (r) => { S.meetings = r; rerender(); });
     st.sub('tasks', {}, (r) => { S.tasks = r; rerender(); });
+    st.sub('alerts', {}, (r) => { S.alerts = r; rerender(); });
     if (isAdmin()) st.sub('invites', {}, (r) => { S.invites = r; rerender(); });
   } else {
     st.sub('bevents', { mine: true }, (r) => { S.myEvents = r; rerender(); });

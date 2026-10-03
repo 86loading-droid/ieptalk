@@ -15,7 +15,8 @@ const pathOf = (kind, p = {}) => ({
   rooms: `schools/${S}/rooms`,
   messages: `schools/${S}/rooms/${p.rid}/messages`,
   meetings: `schools/${S}/meetings`,
-  tasks: `schools/${S}/tasks`
+  tasks: `schools/${S}/tasks`,
+  alerts: `schools/${S}/alerts`
 }[kind]);
 
 // 질의 조건: 보조인력은 자기에게 배정된 학생과 자기가 저장한 기록만 읽는다(서버 규칙과 같은 조건).
@@ -26,6 +27,7 @@ function filtersFor(kind, p, me) {
     if (p.sid) return [['studentId', '==', p.sid]];
   }
   if (kind === 'rooms') return [['memberUids', 'array-contains', me.uid]];
+  if (kind === 'alerts') return [['to', 'array-contains', me.uid]];
   return [];
 }
 
@@ -181,6 +183,8 @@ function makeDemoStore() {
     const t = todayStr();
     put(pathOf('meetings'), { id: 'mt1', kind: 'meeting', title: '하람 행동지원 협의', date: addDays(t, 2), start: '15:00', minutes: 40, organizer: 'u-admin', attendees: { 'u-admin': 'accepted', 'u-t2': 'pending', 'u-t3': 'accepted' }, attendeeUids: ['u-admin', 'u-t2', 'u-t3'], studentId: 's1', place: '특수학급 교실', memo: '기초선 자료 검토, 중재 시작일 결정', createdAt: now });
     put(pathOf('meetings'), { id: 'mt2', kind: 'call', title: '도담 수학 조정 통화', date: addDays(t, 1), start: '16:10', minutes: 10, organizer: 'u-t3', attendees: { 'u-t3': 'accepted', 'u-admin': 'pending' }, attendeeUids: ['u-t3', 'u-admin'], studentId: 's2', place: '내선 214', memo: '평가 조정 범위 확인', createdAt: now });
+    put(pathOf('alerts'), { id: 'al1', type: 'urgent', title: '하람 위기행동 긴급 협의', text: `오늘 15:30 · 특수학급 교실 · 오늘 3교시 사건 공유`, from: 'u-t3', to: ['u-admin', 'u-t2', 'u-t4'], at: now - 600e3, roomId: 'r-all', meetingId: '', ack: {}, hidden: {} });
+    put(pathOf('messages', { rid: 'r-all' }), { id: 'm4', by: 'u-t3', at: now - 600e3, kind: 'notice', noticeType: 'urgent', text: `[긴급회의] 하람 위기행동 긴급 협의 · 오늘 15:30 · 특수학급 교실\n오늘 3교시 사건 공유` });
     put(pathOf('tasks'), { id: 'tk1', title: '하람 그림카드 세트 교체', assignee: 'u-admin', due: addDays(t, 3), done: false, createdBy: 'u-t2', createdAt: now, studentId: 's1' });
     void u;
     return d;
