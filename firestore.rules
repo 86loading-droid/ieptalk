@@ -20,6 +20,10 @@ service cloud.firestore {
       function stu(sid) { return get(/databases/$(database)/documents/schools/$(s)/students/$(sid)).data; }
       function assignedAide(sid) { return isAide() && request.auth.uid in stu(sid).aideUids; }
       function onlyChanged(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+      // 시험용 봇 교사: 로그인 계정이 없는 자료용 구성원. 관리자만 만들고, 관리자 화면에서 봇 대신 시험 메시지·알림을 보낼 수 있다.
+      function isBot(u) { return u is string && u.matches('bot-[a-z0-9-]+')
+        && exists(/databases/$(database)/documents/schools/$(s)/members/$(u))
+        && get(/databases/$(database)/documents/schools/$(s)/members/$(u)).data.bot == true; }
 
       // 학교 설정(학사일정, 경고 기준)
       allow read: if isMember() || isOwner();
@@ -35,7 +39,8 @@ service cloud.firestore {
       match /members/{uid} {
         function invite() { return get(/databases/$(database)/documents/schools/$(s)/invites/$(myEmail())).data; }
         allow read: if isMember() || (signedIn() && uid == request.auth.uid);
-        allow create: if signedIn() && uid == request.auth.uid
+        allow create: if (isAdmin() && uid.matches('bot-[a-z0-9-]+') && request.resource.data.bot == true && request.resource.data.role == 'teacher')
+          || signedIn() && uid == request.auth.uid
           && request.resource.data.email == myEmail() && request.resource.data.active == true
           && ((isOwner() && request.resource.data.role == 'admin')
               || (exists(/databases/$(database)/documents/schools/$(s)/invites/$(myEmail())) && request.resource.data.role == invite().role));
@@ -78,7 +83,9 @@ service cloud.firestore {
         match /messages/{mid} {
           function room() { return get(/databases/$(database)/documents/schools/$(s)/rooms/$(rid)).data; }
           allow read: if isTeacher() && request.auth.uid in room().memberUids;
-          allow create: if isTeacher() && request.auth.uid in room().memberUids && request.resource.data.by == request.auth.uid;
+          allow create: if isTeacher() && request.auth.uid in room().memberUids
+            && (request.resource.data.by == request.auth.uid
+                || (isAdmin() && request.resource.data.by in room().memberUids && isBot(request.resource.data.by)));
           allow update, delete: if isTeacher() && resource.data.by == request.auth.uid;
         }
       }
@@ -96,7 +103,7 @@ service cloud.firestore {
       // 알림 띠(전화 예약·긴급회의·공지): 받는 사람은 읽고, 자기 확인·삭제 표시만 바꾼다. 보낸 사람은 지울 수 있다.
       match /alerts/{aid} {
         allow read: if isTeacher() && (request.auth.uid in resource.data.to || resource.data.from == request.auth.uid);
-        allow create: if isTeacher() && request.resource.data.from == request.auth.uid
+        allow create: if isTeacher() && (request.resource.data.from == request.auth.uid || (isAdmin() && isBot(request.resource.data.from)))
           && request.resource.data.ack == {} && request.resource.data.hidden == {};
         allow update: if isTeacher() && request.auth.uid in resource.data.to && onlyChanged(['ack', 'hidden'])
           && request.resource.data.ack.diff(resource.data.ack).affectedKeys().hasOnly([request.auth.uid])
