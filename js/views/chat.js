@@ -114,7 +114,7 @@ function roomView(rid) {
     <header class="room-head"><a class="back only-m" href="#/chat" aria-label="대화 목록으로">‹</a>
       <div class="grow"><h2 class="h3">${esc(roomTitle(r))}</h2><small class="muted">${r.memberUids.map((u) => esc(nameOf(u))).join(', ')}</small>
       ${stu ? `<br><a class="small" href="#/student/${stu.id}/goals">${esc(stu.alias)} 학생 화면 열기</a>` : ''}</div>
-      <div class="btns"><button type="button" class="sm notice-btn" data-act="notice-new" data-rid="${rid}">공지·알림 보내기</button><button type="button" class="ghost sm" data-act="room-call" data-rid="${rid}">전화 예약</button>
+      <div class="btns"><button type="button" class="sm notice-btn" data-act="notice-new" data-rid="${rid}">공지·알림 보내기</button><button type="button" class="ghost sm" data-act="call-new" data-rid="${rid}">전화 예약</button>
       <button type="button" class="ghost sm" data-act="room-meet" data-rid="${rid}">회의 예약</button>
       ${r.type !== 'dm' ? `<button type="button" class="ghost sm" data-act="room-members" data-rid="${rid}">참여자</button>` : ''}</div></header>
     <ol class="msgs" data-keep-scroll="msgs-${rid}" aria-live="polite">${items || '<li class="muted">첫 메시지를 남겨 보세요.</li>'}</ol>

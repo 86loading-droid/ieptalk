@@ -17,7 +17,7 @@ export async function sendAlert({ type, title, text, to, roomId = '', meetingId 
   const recipients = [...new Set(to)].filter((u) => u && u !== S.me.uid);
   if (!recipients.length) return null;
   const id = await S.store.create('alerts', {}, { type, title, text, from: S.me.uid, to: recipients, at: Date.now(), roomId, meetingId, ack: {}, hidden: {} });
-  autoRespond({ to: recipients, roomId, meetingId });
+  autoRespond({ to: recipients, roomId, meetingId, kind: type });
   return id;
 }
 
@@ -84,23 +84,27 @@ export function openNoticeModal(o = {}) {
       <label><input type="radio" name="type" value="notice" ${type === 'notice' ? 'checked' : ''}><span>일반 공지</span></label></fieldset>
     ${room ? `<p class="small">받는 사람: ${esc(room.memberUids.filter((u) => u !== S.me.uid).map(nameOf).join(', '))} (이 대화방)</p>`
       : `<fieldset><legend>받는 사람 <button type="button" class="link sm" data-all>모두 고르기</button></legend><div class="chk-list">${others.map((m) => `<label class="chk"><input type="checkbox" name="u" value="${m.id}" ${pre.has(m.id) ? 'checked' : ''}> ${esc(m.name)} <small class="muted">${esc(m.title || '')}</small></label>`).join('') || '<p class="muted small">초대된 다른 교사가 없습니다.</p>'}</div></fieldset>`}
-    <label>제목<input name="title" required maxlength="40" value="${esc(o.title || '')}" placeholder="예: 하람 위기행동 긴급 협의"></label>
+    <p class="call-note small" hidden>받는 선생님 화면에 「${esc(S.me.name)} 선생님이 전화를 요청했습니다」로 뜹니다. 시간이나 용건이 필요하면 아래 내용에만 적으세요.</p>
+    <label data-title>제목<input name="title" required maxlength="40" value="${esc(o.title || '')}" placeholder="예: 하람 위기행동 긴급 협의"></label>
     <div class="when">
       <div class="row3"><label>날짜<input type="date" name="date" value="${todayStr(slot)}"></label>
       <label>시각<input type="time" name="start" step="600" value="${timeStr(slot)}"></label>
       <label>길이<select name="minutes">${[10, 20, 30, 40, 60].map((n) => `<option value="${n}" ${n === 20 ? 'selected' : ''}>${n}분</option>`).join('')}</select></label></div>
       <label data-place>장소<input name="place" placeholder="예: 특수학급 교실, 내선 214"></label>
     </div>
-    <label>내용<textarea name="text" rows="3" placeholder="꼭 알려야 할 내용을 짧게"></textarea></label>
+    <label>내용<span class="muted small" data-opt hidden> (선택)</span><textarea name="text" rows="3" placeholder="꼭 알려야 할 내용을 짧게"></textarea></label>
     <div class="actions"><span class="grow"></span><button type="button" class="ghost" data-close>취소</button><button type="submit" class="primary">보내기</button></div></form>`, {
     wide: true,
     onOpen: (m) => {
       const f = m.querySelector('form');
       const upd = () => {
         const t = f.type.value;
-        f.querySelector('.when').hidden = t === 'notice';
-        f.querySelector('[data-place]').firstChild.textContent = t === 'call' ? '연락 방법(내선·교무실 전화 등)' : '장소';
-        f.minutes.value = t === 'call' ? (f.minutes.value === '20' ? '10' : f.minutes.value) : f.minutes.value;
+        // 전화 예약은 받는 사람과 (필요하면) 내용만: 제목·날짜·시각·길이 없음
+        f.querySelector('.when').hidden = t !== 'urgent';
+        f.querySelector('[data-title]').hidden = t === 'call';
+        f.title.required = t !== 'call';
+        f.querySelector('.call-note').hidden = t !== 'call';
+        f.querySelector('[data-opt]').hidden = t !== 'call';
       };
       f.addEventListener('change', upd); upd();
       const all = m.querySelector('[data-all]');
@@ -110,12 +114,13 @@ export function openNoticeModal(o = {}) {
       const t = fd.get('type');
       const to = room ? room.memberUids.filter((u) => u !== S.me.uid) : fd.getAll('u');
       if (!to.length) { toast('받는 사람을 한 명 이상 고르세요'); return false; }
-      const title = fd.get('title'), text = fd.get('text') || '';
+      const text = (fd.get('text') || '').trim();
+      const title = t === 'call' ? `${S.me.name} 선생님이 전화를 요청했습니다` : fd.get('title');
       const roomId = room ? room.id : await roomFor(to);
       let meetingId = '', when = '';
-      if (t !== 'notice') {
+      if (t === 'urgent') {
         const uids = [S.me.uid, ...to];
-        const data = { kind: t === 'call' ? 'call' : 'meeting', title, date: fd.get('date'), start: fd.get('start'), minutes: Number(fd.get('minutes')), place: fd.get('place') || '', studentId: '', memo: text, attendeeUids: uids, attendees: Object.fromEntries(uids.map((u) => [u, u === S.me.uid ? 'accepted' : 'pending'])), roomId, organizer: S.me.uid, urgent: t === 'urgent', createdAt: Date.now(), canceled: false };
+        const data = { kind: 'meeting', title, date: fd.get('date'), start: fd.get('start'), minutes: Number(fd.get('minutes')), place: fd.get('place') || '', studentId: '', memo: text, attendeeUids: uids, attendees: Object.fromEntries(uids.map((u) => [u, u === S.me.uid ? 'accepted' : 'pending'])), roomId, organizer: S.me.uid, urgent: t === 'urgent', createdAt: Date.now(), canceled: false };
         meetingId = await S.store.create('meetings', {}, data);
         when = `${fmtDate(data.date)} ${data.start}${data.place ? ' · ' + data.place : ''}`;
       }
@@ -128,5 +133,7 @@ export function openNoticeModal(o = {}) {
   });
 }
 on('notice-new', (el) => openNoticeModal({ roomId: el.dataset.rid || '', type: el.dataset.type || '' }));
+// 전화 예약 버튼(대화방·일정 화면): 받는 사람과 내용만 정하는 간단한 창
+on('call-new', (el) => openNoticeModal({ roomId: el.dataset.rid || '', type: 'call' }));
 
 export { addDays };

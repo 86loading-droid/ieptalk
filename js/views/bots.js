@@ -29,6 +29,7 @@ export function autoRespond({ to = [], roomId = '', meetingId = '', kind = 'aler
       if (mt && mt.organizer === S.me.uid && mt.attendees?.[b] === 'pending') await S.store.update('meetings', {}, mt.id, { [`attendees.${b}`]: 'accepted' });
       const text = kind === 'chat' ? '메시지 받았습니다. (시험용 봇 자동 응답)'
         : mt ? `알림 확인했습니다. ${fmtDate(mt.date)} ${mt.start} ${mt.kind === 'call' ? '통화' : '회의'}에 참석하겠습니다. (시험용 봇 자동 응답)`
+        : kind === 'call' ? '전화 요청 확인했습니다. 곧 전화드리겠습니다. (시험용 봇 자동 응답)'
         : '공지 확인했습니다. (시험용 봇 자동 응답)';
       await botSay(roomId, b, text);
     } catch (e) { console.warn('bot', e); }
@@ -58,7 +59,7 @@ on('bot-send', async (el) => {
   const when = `${fmtDate(todayStr(soon))} ${timeStr(soon)}`;
   const t = {
     urgent: ['긴급회의', '하람 위기행동 긴급 협의', `${when} · 특수학급 교실 · 오늘 사건 공유`],
-    call: ['전화 예약', '도담 수업 조정 통화 요청', `${when} · 10분 · 내선 214`],
+    call: ['전화 예약', `${nameOf(bot)} 선생님이 전화를 요청했습니다`, '도담 수업 조정 건입니다'],
     notice: ['공지', '다음 주 IEP 중간 점검 안내', '목요일까지 목표별 측정값을 입력해 주세요']
   }[type];
   await botSay(rid, bot, `[${t[0]}] ${t[1]} · ${t[2]}`, { kind: 'notice', noticeType: type });

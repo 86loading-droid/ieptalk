@@ -50,7 +50,7 @@ export function render() {
   const [y, mo] = month.split('-').map(Number);
   const prev = new Date(y, mo - 2, 1), next = new Date(y, mo, 1);
   const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-  return `<div class="page-head"><h1>일정·예약</h1><div class="btns"><button type="button" class="primary" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="ghost" data-act="mt-new" data-kind="call">전화 예약</button></div></div>
+  return `<div class="page-head"><h1>일정·예약</h1><div class="btns"><button type="button" class="primary" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="ghost" data-act="call-new">전화 예약</button></div></div>
   ${pending.length ? `<section class="card attn"><h2 class="h3">응답을 기다리는 초대 ${pending.length}건</h2>${pending.map((m) => meetingCard(m)).join('')}</section>` : ''}
   <div class="cal-wrap">
     <section class="card cal">
@@ -103,9 +103,7 @@ export function openMeetingModal(o = {}) {
   const att = new Set(o.attendeeUids || []); att.add(S.me.uid);
   const date = o.date || addDays(todayStr(), 1);
   openModal(`<form class="mt-form"><h2>${o.editId ? '일정 시간 변경' : kind === 'call' ? '전화 예약' : '회의 예약'}</h2>
-    <fieldset class="seg"><legend class="sr">종류</legend>
-      <label><input type="radio" name="kind" value="meeting" ${kind === 'meeting' ? 'checked' : ''}><span>회의</span></label>
-      <label><input type="radio" name="kind" value="call" ${kind === 'call' ? 'checked' : ''}><span>전화</span></label></fieldset>
+    <input type="hidden" name="kind" value="meeting">
     <label>제목<input name="title" value="${esc(o.title || '')}" required placeholder="예: 4학년 통합학급 수업 조정 협의"></label>
     <div class="row3"><label>날짜<input type="date" name="date" value="${esc(date)}" required></label>
       <label>시작<input type="time" name="start" value="${esc(o.start || '15:00')}" step="600" required></label>

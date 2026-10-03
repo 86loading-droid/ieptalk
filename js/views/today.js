@@ -80,7 +80,7 @@ export function render() {
   const pCal = post('tone-violet', '#/calendar', '일정·예약', pending.length || null,
     `${pending.length ? `<p class="sub">응답할 초대</p><ul class="mini">${pending.map((m) => mRow(m, true)).join('')}</ul>` : ''}
      <p class="sub">다가오는 일정(2주)</p><ul class="mini">${mine.map((m) => mRow(m, false)).join('') || '<li class="muted">예정된 일정이 없습니다.</li>'}</ul>`,
-    `<div class="post-foot"><button type="button" class="sm ghost" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="sm ghost" data-act="mt-new" data-kind="call">전화 예약</button></div>`);
+    `<div class="post-foot"><button type="button" class="sm ghost" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="sm ghost" data-act="call-new">전화 예약</button></div>`);
 
   // 7. 할 일
   const tasks = S.tasks.filter((k) => k.assignee === S.me.uid && !k.done).sort((a, b) => (a.due > b.due ? 1 : -1));
