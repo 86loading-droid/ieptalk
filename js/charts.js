@@ -45,7 +45,7 @@ export function progressWarning(goal, n = 3) {
   return null;
 }
 
-// 행동 자료를 회기(날짜)별 값으로 묶는다. 빈도는 회기당 횟수, 지속시간은 회기당 총 분.
+// 행동 자료를 날짜별 값으로 묶는다. 하루 안의 관찰 회기(예: 2교시·4교시)를 합친 값이다. 빈도는 하루 합계 횟수, 지속시간은 하루 합계 분.
 export function behaviorSeries(target, events) {
   const byDay = new Map();
   events.filter((e) => e.targetId === target.id).forEach((e) => {
@@ -69,7 +69,7 @@ export function baselineStats(series) {
 
 export function behaviorChart(target, series) {
   if (!series.length) return '<p class="muted">아직 기록이 없습니다. 기록 버튼을 누르면 회기별 그래프가 그려집니다.</p>';
-  const unit = target.method === 'dur' ? '회기당 지속시간(분)' : '회기당 발생 횟수';
+  const unit = target.method === 'dur' ? '하루(관찰 회기 합계) 지속시간(분)' : '하루(관찰 회기 합계) 발생 횟수';
   const ymax = Math.max(...series.map((p) => p.v), 1) * 1.2;
   const n = series.length;
   const X = (i) => L + 14 + (W - L - R - 28) * (n === 1 ? 0.5 : i / (n - 1));
