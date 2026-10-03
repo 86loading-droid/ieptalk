@@ -130,6 +130,8 @@ function startGlobal() {
     st.sub('meetings', {}, (r) => { S.meetings = r; rerender(); });
     st.sub('tasks', {}, (r) => { S.tasks = r; rerender(); });
     st.sub('alerts', {}, (r) => { S.alerts = r; rerender(); });
+    st.sub('acad', {}, (r) => { S.acad = r; rerender(); });
+    st.sub('appts', {}, (r) => { S.appts = r; rerender(); });
     if (isAdmin()) st.sub('invites', {}, (r) => { S.invites = r; rerender(); });
   } else {
     st.sub('bevents', { mine: true }, (r) => { S.myEvents = r; rerender(); });

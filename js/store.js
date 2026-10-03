@@ -2,6 +2,7 @@
 // 화면 코드는 이 파일의 공통 함수만 쓰므로, 학교 서버로 옮길 때는 이 파일만 바꾸면 된다.
 import { FIREBASE_CONFIG, SCHOOL_ID, OWNER_EMAILS, USE_EMULATOR } from './config.js';
 import { newId, todayStr, addDays } from './util.js';
+import { acadExamples, apptExamples } from './calExamples.js';
 
 const S = SCHOOL_ID;
 const pathOf = (kind, p = {}) => ({
@@ -16,7 +17,9 @@ const pathOf = (kind, p = {}) => ({
   messages: `schools/${S}/rooms/${p.rid}/messages`,
   meetings: `schools/${S}/meetings`,
   tasks: `schools/${S}/tasks`,
-  alerts: `schools/${S}/alerts`
+  alerts: `schools/${S}/alerts`,
+  acad: `schools/${S}/acad`,
+  appts: `schools/${S}/appts`
 }[kind]);
 
 // 질의 조건: 보조인력은 자기에게 배정된 학생과 자기가 저장한 기록만 읽는다(서버 규칙과 같은 조건).
@@ -28,6 +31,7 @@ function filtersFor(kind, p, me) {
   }
   if (kind === 'rooms') return [['memberUids', 'array-contains', me.uid]];
   if (kind === 'alerts') return [['to', 'array-contains', me.uid]];
+  if (kind === 'appts') return [['memberUids', 'array-contains', me.uid]];
   return [];
 }
 
@@ -161,13 +165,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 1) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 2) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 1, school: defaultSchool(), c: {} };
+    const d = { v: 2, school: defaultSchool(), c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));
@@ -185,6 +189,8 @@ function makeDemoStore() {
     put(pathOf('meetings'), { id: 'mt2', kind: 'call', title: '도담 수학 조정 통화', date: addDays(t, 1), start: '16:10', minutes: 10, organizer: 'u-t3', attendees: { 'u-t3': 'accepted', 'u-admin': 'pending' }, attendeeUids: ['u-t3', 'u-admin'], studentId: 's2', place: '내선 214', memo: '평가 조정 범위 확인', createdAt: now });
     put(pathOf('alerts'), { id: 'al1', type: 'urgent', title: '하람 위기행동 긴급 협의', text: `오늘 15:30 · 특수학급 교실 · 오늘 3교시 사건 공유`, from: 'u-t3', to: ['u-admin', 'u-t2', 'u-t4'], at: now - 600e3, roomId: 'r-all', meetingId: '', ack: {}, hidden: {} });
     put(pathOf('messages', { rid: 'r-all' }), { id: 'm4', by: 'u-t3', at: now - 600e3, kind: 'notice', noticeType: 'urgent', text: `[긴급회의] 하람 위기행동 긴급 협의 · 오늘 15:30 · 특수학급 교실\n오늘 3교시 사건 공유` });
+    acadExamples().forEach((x, i) => put(pathOf('acad'), { id: `ac${i}`, ...x, createdBy: 'u-admin' }));
+    apptExamples('u-admin', ['u-t2', 'u-t3']).forEach((x, i) => put(pathOf('appts'), { id: `ap${i}`, ...x, createdAt: now }));
     put(pathOf('tasks'), { id: 'tk1', title: '하람 그림카드 세트 교체', assignee: 'u-admin', due: addDays(t, 3), done: false, createdBy: 'u-t2', createdAt: now, studentId: 's1' });
     void u;
     return d;
