@@ -46,9 +46,12 @@ async def main():
         await t1.goto(BASE + '#/chat/r-s1'); await t1.wait_for_timeout(800)
         got = await t1.locator('.msg >> text=내일 3교시').count()
         print('realtime message received by admin:', got)
-        # 전화 예약: admin → t2
-        await t1.click('[data-act="room-call"]'); await t1.wait_for_selector('.mt-form')
+        # 전화 예약: 받는 사람만 고르면 끝(제목·시각 없음)
+        await t1.click('[data-act="call-new"]'); await t1.wait_for_selector('.notice-form')
         await t1.screenshot(path=f'{OUT}/desk_call_modal.png')
+        await t1.click('.notice-form [type=submit]'); await t1.wait_for_timeout(600)
+        # 회의 예약: admin → t2
+        await t1.click('[data-act="room-meet"]'); await t1.wait_for_selector('.mt-form')
         await t1.click('.mt-form [type=submit]'); await t1.wait_for_timeout(600)
         await t2.goto(BASE + '#/calendar'); await t2.wait_for_timeout(600)
         pend = await t2.locator('.card.attn .mcard').count()
