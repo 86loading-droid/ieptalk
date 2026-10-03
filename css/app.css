@@ -395,3 +395,42 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 .rec-btn.mini .rec-name { font-size: 1.05rem; }
 .rec-btn.mini .rec-sub { font-size: .72rem; }
 @media (max-width: 520px) { .board { column-width: auto; column-count: 1; } }
+
+/* ===== 알림 띠: 받은 공지·예약이 화면 맨 위에서 깜박임 ===== */
+.alerts-bar { background: var(--bg); border-bottom: 1px solid var(--line); padding: .5rem 1rem; }
+@media (min-width: 900px) { body.signed-in .alerts-bar { grid-column: 1 / -1; } }
+.alerts-bar ul { list-style: none; margin: 0 auto; padding: 0; max-width: 1180px; display: flex; flex-direction: column; gap: .4rem; }
+.alerts-bar > .link { display: block; margin: .2rem auto 0; }
+.alert-item { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; padding: .45rem .7rem; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); }
+.alert-kind { flex: none; font-weight: 700; font-size: .82rem; padding: .15rem .6rem; border-radius: 99px; display: inline-flex; gap: .35rem; align-items: center; }
+.alert-new { background: var(--text); color: #fff; border-radius: 99px; padding: 0 .4rem; font-size: .7rem; }
+.alert-text { flex: 1 1 260px; min-width: 0; }
+.alert-text small { display: block; color: var(--muted); font-size: .76rem; }
+.alert-btns { display: flex; gap: .3rem; flex: none; }
+.alert-btns button { min-height: 34px; padding: .15rem .7rem; font-size: .85rem; }
+.alert-item.urgent .alert-kind { background: var(--danger-soft); color: var(--danger); }
+.alert-item.call .alert-kind { background: var(--sky-soft); color: var(--sky); }
+.alert-item.meeting .alert-kind { background: var(--primary-soft); color: var(--primary); }
+.alert-item.notice .alert-kind { background: var(--sun-soft); color: var(--sun-ink); }
+.alert-item.seen { border-width: 1px; background: #FFFEFA; }
+/* 확인 전에는 1.2초 간격으로 천천히 깜박임(초당 3회 미만) */
+@keyframes blinkUrgent { 0%, 100% { background: #FDE3DD; border-color: var(--danger); } 50% { background: #FFFFFF; border-color: #F2C2B9; } }
+@keyframes blinkCall { 0%, 100% { background: #DCE9F8; border-color: var(--sky); } 50% { background: #FFFFFF; border-color: #BCD2EE; } }
+@keyframes blinkMeet { 0%, 100% { background: #DCEFE3; border-color: var(--primary); } 50% { background: #FFFFFF; border-color: #BFDCCB; } }
+@keyframes blinkNotice { 0%, 100% { background: #FBEBB2; border-color: #D6A619; } 50% { background: #FFFFFF; border-color: #F1DC9A; } }
+.alert-item.blink.urgent { animation: blinkUrgent 1.2s ease-in-out infinite; }
+.alert-item.blink.call { animation: blinkCall 1.2s ease-in-out infinite; }
+.alert-item.blink.meeting { animation: blinkMeet 1.2s ease-in-out infinite; }
+.alert-item.blink.notice { animation: blinkNotice 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .alert-item.blink { animation: none !important; border-width: 3px; }
+  .alert-item.blink.urgent { background: #FDE3DD; } .alert-item.blink.call { background: #DCE9F8; } .alert-item.blink.meeting { background: #DCEFE3; } .alert-item.blink.notice { background: #FBEBB2; }
+}
+@media (max-width: 899px) { .alerts-bar { padding: .4rem .6rem; } .alert-text { flex-basis: 100%; order: 2; } .alert-kind { order: 1; } .alert-btns { order: 3; margin-left: auto; } }
+.tag.urgent { background: var(--danger-soft); color: var(--danger); }
+.tag.notice { background: var(--sun-soft); color: var(--sun-ink); }
+.bubble.notice, .msg.mine .bubble.notice { background: #FFFBF1; color: var(--text); border: 1px solid #F0D9A8; }
+.bubble.notice p + p { margin-top: .3rem; }
+button.notice-btn { background: var(--danger-soft); color: var(--danger); border-color: #F2C2B9; font-weight: 600; }
+button.notice-btn:hover { border-color: var(--danger); }
+.seg3 span { padding: .5rem .8rem; }
