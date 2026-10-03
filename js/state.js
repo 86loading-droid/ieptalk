@@ -15,7 +15,9 @@ let renderFn = () => {};
 export const setRender = (fn) => { renderFn = fn; };
 export function rerender() {
   if (scheduled) return; scheduled = true;
-  requestAnimationFrame(() => { scheduled = false; renderFn(); });
+  const run = () => { scheduled = false; renderFn(); };
+  // 탭이 가려져 있으면 requestAnimationFrame이 멈추므로 타이머로 그린다(알림이 바로 반영되게)
+  if (document.hidden) setTimeout(run, 30); else requestAnimationFrame(run);
 }
 
 // 경로에 묶인 구독: 화면을 떠나면 해제
