@@ -2,6 +2,7 @@
 import { esc, todayStr, fmtDate, addDays, toMs, parseDate, openModal, toast, googleCalUrl, timeStr } from '../util.js';
 import { S, on, rerender, teachers, nameOf, student, go } from '../state.js';
 import { ensureRoom, postMessage } from './chat.js';
+import { sendAlert } from './alerts.js';
 import { confirmInline } from './record.js';
 
 const KIND = { meeting: '회의', call: '전화' };
@@ -145,6 +146,7 @@ export function openMeetingModal(o = {}) {
       if (id) await S.store.update('meetings', {}, id, { ...data, attendees, roomId });
       else id = await S.store.create('meetings', {}, { ...data, attendees, roomId, organizer: S.me.uid, createdAt: Date.now(), canceled: false });
       if (fd.get('notify') && roomId) await postMessage(roomId, { kind: 'booking', meetingId: id, bookingKind: data.kind, text: `${data.title} ${fmtDate(data.date)} ${data.start}${o.editId ? ' (시간 변경)' : ''}` });
+      await sendAlert({ type: data.kind === 'call' ? 'call' : 'meeting', title: `${data.title}${o.editId ? ' (시간 변경)' : ''}`, text: `${fmtDate(data.date)} ${data.start} · ${data.minutes}분${data.place ? ' · ' + data.place : ''}`, to: uids, roomId, meetingId: id });
       S.ui.calDay = data.date; S.ui.calMonth = data.date.slice(0, 7);
       toast(o.editId ? '시간을 바꾸고 참석자에게 다시 물었습니다' : `${KIND[data.kind]} 예약을 보냈습니다`);
       rerender();

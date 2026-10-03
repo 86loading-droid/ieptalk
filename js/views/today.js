@@ -70,7 +70,7 @@ export function render() {
   const unread = S.rooms.filter(isUnread).length;
   const pChat = post('tone-sky', '#/chat', '메신저', unread || null,
     `<ul class="mini">${rooms.map((r) => { const l = roomLast(r); return `<li><a class="grow room-mini" href="#/chat/${r.id}">${isUnread(r) ? '<span class="dot-new" aria-label="안 읽음"></span>' : ''}<b>${esc(roomTitle(r))}</b><small class="ellip">${esc(l.lastText || '')}</small></a><small class="muted">${l.lastAt ? relTime(l.lastAt) : ''}</small></li>`; }).join('') || '<li class="muted">대화가 없습니다.</li>'}</ul>`,
-    `<div class="post-foot"><button type="button" class="sm ghost" data-act="room-new">새 대화</button></div>`);
+    `<div class="post-foot"><button type="button" class="sm notice-btn" data-act="notice-new" data-type="urgent">긴급회의 공지</button><button type="button" class="sm ghost" data-act="notice-new" data-type="call">전화 예약</button><button type="button" class="sm ghost" data-act="notice-new" data-type="notice">단체 공지</button><button type="button" class="sm ghost" data-act="room-new">새 대화</button></div>`);
 
   // 6. 일정·예약
   const pending = S.meetings.filter((m) => !m.canceled && m.attendees?.[S.me.uid] === 'pending' && m.organizer !== S.me.uid && end(m) > Date.now());

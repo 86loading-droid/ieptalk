@@ -64,7 +64,7 @@ export function render(route) {
       ${r.type === 'dm' ? avatar((r.memberUids || []).find((u) => u !== S.me.uid) || S.me.uid) : `<span class="avatar grp" aria-hidden="true">${r.type === 'student' ? '학' : '모'}</span>`}
       <span class="grow"><b>${esc(roomTitle(r))}</b>${r.type !== 'dm' ? ` <small class="muted">${r.memberUids.length}명</small>` : ''}<br><small class="muted ellip">${esc(l.lastText || '')}</small></span>
       <span class="room-side"><small class="muted">${l.lastAt ? relTime(l.lastAt) : ''}</small>${isUnread(r) ? '<span class="dot-new" aria-label="안 읽음"></span>' : ''}</span></a>`; }).join('');
-  const listCol = `<aside class="rooms ${rid ? 'hide-m' : ''}"><div class="rooms-head"><h1 class="h2">메신저</h1><button type="button" class="primary sm" data-act="room-new">새 대화</button></div>
+  const listCol = `<aside class="rooms ${rid ? 'hide-m' : ''}"><div class="rooms-head"><h1 class="h2">메신저</h1><span class="btns"><button type="button" class="ghost sm" data-act="notice-new">공지·알림</button><button type="button" class="primary sm" data-act="room-new">새 대화</button></span></div>
     <p class="muted small">교사끼리만 쓰는 대화입니다(담임·옆반·부장·교감). 보조인력과 보호자는 들어오지 않습니다.</p>${list || '<p class="muted">대화가 없습니다.</p>'}</aside>`;
   return `<div class="chat ${rid ? 'has-room' : ''}">${listCol}${rid ? roomView(rid) : '<section class="room-view empty hide-m"><p class="muted">왼쪽에서 대화를 고르세요.</p></section>'}</div>`;
 }
@@ -87,6 +87,10 @@ function roomView(rid) {
     if (m.kind === 'booking') {
       const mt = S.meetings.find((x) => x.id === m.meetingId);
       body = mt ? meetingCard(mt, { compact: true }) : `<p>${esc(m.text)}</p><small class="muted">(취소된 예약)</small>`;
+    } else if (m.kind === 'notice') {
+      const nt = { urgent: ['urgent', '긴급회의'], call: ['call', '전화 예약'], notice: ['notice', '공지'] }[m.noticeType] || ['notice', '공지'];
+      const mt = m.meetingId ? S.meetings.find((x) => x.id === m.meetingId) : null;
+      body = `<p><span class="tag ${nt[0]}">${nt[1]}</span></p><p>${esc(m.text).replace(/\n/g, '<br>')}</p>${mt ? meetingCard(mt, { compact: true }) : ''}`;
     } else if (m.kind === 'task') {
       body = `<p>할 일을 만들었습니다: <b>${esc(m.text)}</b></p>`;
     } else {
@@ -109,7 +113,7 @@ function roomView(rid) {
     <header class="room-head"><a class="back only-m" href="#/chat" aria-label="대화 목록으로">‹</a>
       <div class="grow"><h2 class="h3">${esc(roomTitle(r))}</h2><small class="muted">${r.memberUids.map((u) => esc(nameOf(u))).join(', ')}</small>
       ${stu ? `<br><a class="small" href="#/student/${stu.id}/goals">${esc(stu.alias)} 학생 화면 열기</a>` : ''}</div>
-      <div class="btns"><button type="button" class="ghost sm" data-act="room-call" data-rid="${rid}">전화 예약</button>
+      <div class="btns"><button type="button" class="sm notice-btn" data-act="notice-new" data-rid="${rid}">공지·알림 보내기</button><button type="button" class="ghost sm" data-act="room-call" data-rid="${rid}">전화 예약</button>
       <button type="button" class="ghost sm" data-act="room-meet" data-rid="${rid}">회의 예약</button>
       ${r.type !== 'dm' ? `<button type="button" class="ghost sm" data-act="room-members" data-rid="${rid}">참여자</button>` : ''}</div></header>
     <ol class="msgs" data-keep-scroll="msgs-${rid}" aria-live="polite">${items || '<li class="muted">첫 메시지를 남겨 보세요.</li>'}</ol>
