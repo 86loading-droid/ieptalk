@@ -91,6 +91,22 @@ service cloud.firestore {
       }
 
       // 일정(회의·전화 예약): 교사 공유 달력. 예약자는 모두 고치고, 참석자는 자기 응답만 고친다.
+      // 학사일정: 교사 모두 읽고, 관리자만 쓴다
+      match /acad/{aid} {
+        allow read: if isTeacher();
+        allow write: if isAdmin();
+      }
+
+      // 선생님들 간의 개인 약속: 함께하는 사람만 읽는다. 만든 사람만 고치고 지운다.
+      match /appts/{pid} {
+        allow read: if isTeacher() && request.auth.uid in resource.data.memberUids;
+        allow create: if isTeacher() && request.auth.uid in request.resource.data.memberUids
+          && (request.resource.data.createdBy == request.auth.uid
+              || (isAdmin() && isBot(request.resource.data.createdBy) && request.resource.data.createdBy in request.resource.data.memberUids));
+        allow update, delete: if isTeacher() && (resource.data.createdBy == request.auth.uid
+          || (isAdmin() && isBot(resource.data.createdBy) && request.auth.uid in resource.data.memberUids));
+      }
+
       match /meetings/{mid} {
         allow read: if isTeacher();
         allow create: if isTeacher() && request.resource.data.organizer == request.auth.uid;
