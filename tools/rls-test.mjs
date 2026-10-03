@@ -20,4 +20,11 @@ console.log('a1 edit own', await as('a1', "UPDATE bevents SET note='수정' WHER
 console.log('a1 edit other', await as('a1', "UPDATE bevents SET note='x' WHERE id='e2' RETURNING id"));
 console.log('a1 rooms', await as('a1', 'SELECT * FROM rooms'));
 console.log('a1 goals', await as('a1', 'SELECT * FROM goals'));
+await db.exec(`RESET ROLE; INSERT INTO members(uid,school_id,email,name,role) VALUES ('t2','s','t2@x','교사2','teacher'),('t3','s','t3@x','교사3','teacher');
+INSERT INTO alerts(id,school_id,type,title,from_uid) VALUES ('al','s','urgent','긴급회의','t1');
+INSERT INTO alert_recipients(alert_id,member_uid) VALUES ('al','t2');`);
+console.log('t2 sees alert', await as('t2', 'SELECT id FROM alerts'));
+console.log('t3 sees alert(none)', await as('t3', 'SELECT id FROM alerts'));
+console.log('t2 ack own', await as('t2', "UPDATE alert_recipients SET ack_at=now() WHERE alert_id='al' RETURNING member_uid"));
+console.log('a1 sees alert(none)', await as('a1', 'SELECT id FROM alerts'));
 console.log('a1 targets', await as('a1', 'SELECT id FROM targets'));
