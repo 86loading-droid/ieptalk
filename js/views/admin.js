@@ -41,6 +41,11 @@ export function render() {
       <button type="submit" class="primary">저장</button>
     </form>
   </section>
+  <section class="card"><h2 class="h3">학사일정 파일로 넣기</h2>
+    <p class="small">학교 학사일정 파일(엑셀 xlsx·xls·csv, 한글 hwp·hwpx, PDF)을 올리면 날짜와 일정 이름을 찾아 미리 보여 줍니다. 고친 뒤 고른 것만 달력에 넣습니다. 파일은 이 브라우저 안에서만 읽습니다.</p>
+    <div class="btns"><button type="button" class="primary" data-act="acad-import">파일 올리기</button><a class="btn-link sm" href="#/calendar">달력 보기</a></div>
+    <p class="small muted">지금 들어 있는 학사일정 ${S.acad.length}건</p>
+  </section>
   <section class="card"><h2 class="h3">시험용 봇 교사</h2>
     <p class="small">로그인하지 않는 시험용 교사입니다. 봇에게 공지·예약·메시지를 보내면 몇 초 뒤 자동으로 답하고, 아래 버튼으로 봇이 나에게 알림을 보내게 할 수 있습니다.</p>
     ${botMembers().length ? `<ul class="rows">${botMembers().map((b) => `<li><span class="grow"><b>${esc(b.name)}</b> <small class="muted">${esc(b.title || '')}</small><br>

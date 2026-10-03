@@ -91,7 +91,7 @@ export function render() {
   const prev = new Date(y, mo - 2, 1), next = new Date(y, mo, 1);
   const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const monthHols = Object.entries(Object.fromEntries([...Array(days)].map((_, i) => { const ds = `${month}-${String(i + 1).padStart(2, '0')}`; return [ds, holidayOf(ds)]; }))).filter(([, n]) => n);
-  return `<div class="page-head"><h1>일정·예약</h1><div class="btns"><button type="button" class="primary" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="ghost" data-act="call-new">전화 예약</button><button type="button" class="ghost" data-act="appt-new">개인 약속</button>${isAdmin() ? '<button type="button" class="ghost" data-act="acad-new">학사일정 추가</button>' : ''}</div></div>
+  return `<div class="page-head"><h1>일정·예약</h1><div class="btns"><button type="button" class="primary" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="ghost" data-act="call-new">전화 예약</button><button type="button" class="ghost" data-act="appt-new">개인 약속</button>${isAdmin() ? '<button type="button" class="ghost" data-act="acad-new">학사일정 추가</button><button type="button" class="ghost" data-act="acad-import">파일로 넣기</button>' : ''}</div></div>
   ${pending.length ? `<section class="card attn"><h2 class="h3">응답을 기다리는 초대 ${pending.length}건</h2>${pending.map((m) => meetingCard(m)).join('')}</section>` : ''}
   <div class="cal-wrap">
     <section class="card cal">
