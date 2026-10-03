@@ -5,6 +5,7 @@ import { warningsFor, goalMissing } from './students.js';
 import { openMeetingModal } from './calendar.js';
 import { roomTitle, isUnread, roomLast } from './chat.js';
 import { behaviorSeries, baselineStats } from '../charts.js';
+import { HOLIDAYS } from '../holidays.js';
 
 export function deadlines(sc) {
   const list = [];
@@ -70,16 +71,23 @@ export function render() {
   const unread = S.rooms.filter(isUnread).length;
   const pChat = post('tone-sky', '#/chat', '메신저', unread || null,
     `<ul class="mini">${rooms.map((r) => { const l = roomLast(r); return `<li><a class="grow room-mini" href="#/chat/${r.id}">${isUnread(r) ? '<span class="dot-new" aria-label="안 읽음"></span>' : ''}<b>${esc(roomTitle(r))}</b><small class="ellip">${esc(l.lastText || '')}</small></a><small class="muted">${l.lastAt ? relTime(l.lastAt) : ''}</small></li>`; }).join('') || '<li class="muted">대화가 없습니다.</li>'}</ul>`,
-    `<div class="post-foot"><button type="button" class="sm notice-btn" data-act="notice-new" data-type="urgent">긴급회의 공지</button><button type="button" class="sm ghost" data-act="notice-new" data-type="call">전화 예약</button><button type="button" class="sm ghost" data-act="notice-new" data-type="notice">단체 공지</button><button type="button" class="sm ghost" data-act="room-new">새 대화</button></div>`);
+    `<div class="post-foot"><button type="button" class="sm notice-btn" data-act="notice-new" data-type="urgent">긴급회의 공지</button><button type="button" class="sm ghost" data-act="call-new">전화 예약</button><button type="button" class="sm ghost" data-act="notice-new" data-type="notice">단체 공지</button><button type="button" class="sm ghost" data-act="room-new">새 대화</button></div>`);
 
   // 6. 일정·예약
   const pending = S.meetings.filter((m) => !m.canceled && m.attendees?.[S.me.uid] === 'pending' && m.organizer !== S.me.uid && end(m) > Date.now());
   const mine = S.meetings.filter((m) => !m.canceled && m.attendeeUids?.includes(S.me.uid) && m.attendees?.[S.me.uid] === 'accepted' && end(m) > Date.now() && m.date <= addDays(t, 14)).sort((a, b) => toMs(a.date, a.start) - toMs(b.date, b.start)).slice(0, 5);
   const mRow = (m, ask) => `<li><span class="tag ${m.kind}">${m.kind === 'call' ? '전화' : '회의'}</span><span class="grow"><b>${esc(m.title)}</b><small>${esc(fmtDate(m.date))} ${esc(m.start)} · ${esc(m.minutes)}분${m.organizer !== S.me.uid ? ` · ${esc(nameOf(m.organizer))}` : ''}</small></span>
     ${ask ? `<span class="btns"><button type="button" class="sm primary" data-act="mt-resp" data-id="${m.id}" data-v="accepted">수락</button><button type="button" class="sm ghost" data-act="mt-resp" data-id="${m.id}" data-v="declined">거절</button></span>` : ''}</li>`;
+  const t14 = addDays(t, 14);
+  const soon = [
+    ...Object.entries(HOLIDAYS).filter(([d]) => d >= t && d <= t14).map(([d, n]) => ({ d, s: '', k: 'hol', tag: '공휴일', title: n, when: fmtDate(d) })),
+    ...S.acad.filter((a) => (a.endDate || a.date) >= t && a.date <= t14).map((a) => ({ d: a.date < t ? t : a.date, s: a.start || '', k: 'acad', tag: '학사', title: a.title, when: `${fmtDate(a.date)}${a.endDate && a.endDate !== a.date ? ' ~ ' + fmtDate(a.endDate) : ''}${a.start ? ' ' + a.start : ''}` })),
+    ...S.appts.filter((p) => p.date >= t && p.date <= t14).map((p) => ({ d: p.date, s: p.start, k: 'appt', tag: '약속', title: p.title, when: `${fmtDate(p.date)} ${p.start}` }))
+  ].sort((a, b) => (a.d + a.s > b.d + b.s ? 1 : -1)).slice(0, 6);
   const pCal = post('tone-violet', '#/calendar', '일정·예약', pending.length || null,
     `${pending.length ? `<p class="sub">응답할 초대</p><ul class="mini">${pending.map((m) => mRow(m, true)).join('')}</ul>` : ''}
-     <p class="sub">다가오는 일정(2주)</p><ul class="mini">${mine.map((m) => mRow(m, false)).join('') || '<li class="muted">예정된 일정이 없습니다.</li>'}</ul>`,
+     <p class="sub">다가오는 일정(2주)</p><ul class="mini">${mine.map((m) => mRow(m, false)).join('') || '<li class="muted">예정된 일정이 없습니다.</li>'}</ul>
+     ${soon.length ? `<p class="sub">학사일정·약속·공휴일(2주)</p><ul class="mini">${soon.map((x) => `<li><span class="tag ${x.k}">${x.tag}</span><span class="grow"><b>${esc(x.title)}</b><small>${esc(x.when)}</small></span></li>`).join('')}</ul>` : ''}`,
     `<div class="post-foot"><button type="button" class="sm ghost" data-act="mt-new" data-kind="meeting">회의 예약</button><button type="button" class="sm ghost" data-act="call-new">전화 예약</button></div>`);
 
   // 7. 할 일

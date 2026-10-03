@@ -4,6 +4,7 @@ import { S, on, rerender, ROLE_LABEL, avatar, teachers, aides } from '../state.j
 import { demoSeed, defaultSchool } from '../store.js';
 import { confirmInline } from './record.js';
 import { botMembers } from './bots.js';
+import { acadExamples, apptExamples } from '../calExamples.js';
 
 const TITLES = ['특수학급 담임', '통합학급 담임', '교과 교사', '특수교육 부장', '교감', '교장', '특수교육실무사', '사회복무요원', '치료지원 담당'];
 
@@ -50,6 +51,8 @@ export function render() {
   <section class="card"><h2 class="h3">시연 자료</h2>
     <p class="small">가상 학생 3명(가명), IEP 목표, 표적행동, 기초선 기록을 넣습니다. 지금 구성원 중 교사·보조인력이 팀과 기록 담당으로 자동 배정됩니다.</p>
     <button type="button" class="ghost" data-act="seed">가상 학생 예시 넣기</button>
+    <button type="button" class="ghost" data-act="seed-cal">학사일정·개인 약속 예시 넣기</button>
+    ${S.acad.some((a) => a.sample) || S.appts.some((p) => p.sample) ? '<button type="button" class="ghost danger" data-act="unseed-cal">일정 예시 지우기</button>' : ''}
     ${S.store.mode === 'demo' ? '<button type="button" class="ghost" data-act="demo-reset">데모 자료 처음으로</button>' : ''}
     <p class="small muted">학교 서버로 옮기는 방법은 저장소의 README 「학교 DB 이식」과 db/schema.sql을 보세요.</p>
   </section></div>`;
@@ -88,4 +91,23 @@ on('seed', async (el) => {
     for (const ev of sd.bevents) { const { id, ...d } = ev; await S.store.create('bevents', {}, { ...d, studentId: map[ev.studentId], targetId: tmap[ev.targetId], createdBy: S.me.uid }); }
     toast('가상 학생 예시를 넣었습니다');
   } finally { el.disabled = false; rerender(); }
+});
+
+// 일정 예시: 2026학년도 2학기 학사일정과, 나와 다른 교사(봇 포함) 사이의 개인 약속
+on('seed-cal', async (el) => {
+  el.disabled = true;
+  try {
+    const others = teachers().filter((m) => m.id !== S.me.uid).map((m) => m.id);
+    const haveA = new Set(S.acad.map((a) => a.date + a.title)), haveP = new Set(S.appts.map((p) => p.date + p.start + p.title));
+    let n = 0;
+    for (const a of acadExamples()) if (!haveA.has(a.date + a.title)) { await S.store.create('acad', {}, { ...a, createdBy: S.me.uid, createdAt: Date.now() }); n++; }
+    for (const p of apptExamples(S.me.uid, others)) if (!haveP.has(p.date + p.start + p.title)) { await S.store.create('appts', {}, { ...p, createdAt: Date.now() }); n++; }
+    toast(n ? `일정 예시 ${n}건을 넣었습니다. 일정·예약에서 확인하세요.` : '이미 들어가 있습니다');
+  } finally { el.disabled = false; rerender(); }
+});
+on('unseed-cal', async (el) => {
+  if (!confirmInline(el)) return;
+  for (const a of S.acad.filter((x) => x.sample)) await S.store.remove('acad', {}, a.id);
+  for (const p of S.appts.filter((x) => x.sample && (x.createdBy === S.me.uid || x.createdBy.startsWith('bot-')))) await S.store.remove('appts', {}, p.id);
+  toast('일정 예시를 지웠습니다');
 });
