@@ -11,6 +11,7 @@ import * as Cal from './views/calendar.js';
 import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
 import { alertsBar } from './views/alerts.js';
+import './views/acadImport.js';
 
 const TEACHER_NAV = [
   ['today', '한눈에', 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z'],
