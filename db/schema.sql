@@ -233,6 +233,44 @@ CREATE TABLE alert_recipients (
   PRIMARY KEY (alert_id, member_uid)
 );
 
+-- 학사일정(학교 전체)과 선생님들 간의 개인 약속 -------------------------------
+-- 국가 공휴일은 js/holidays.js 목록(월력요항 기준)을 이 표에 넣어 쓴다.
+CREATE TABLE holidays (
+  d    date PRIMARY KEY,
+  name text NOT NULL
+);
+CREATE TABLE acad_events (
+  id         text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id  text NOT NULL REFERENCES schools(id),
+  title      text NOT NULL,
+  cat        text NOT NULL DEFAULT 'event' CHECK (cat IN ('event', 'eval', 'meet', 'vac')),
+  d          date NOT NULL,
+  end_d      date NOT NULL,
+  start_time time,
+  end_time   time,
+  place      text NOT NULL DEFAULT '',
+  memo       text NOT NULL DEFAULT '',
+  created_by text REFERENCES members(uid),
+  CHECK (end_d >= d)
+);
+CREATE TABLE appointments (
+  id         text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id  text NOT NULL REFERENCES schools(id),
+  title      text NOT NULL,
+  d          date NOT NULL,
+  start_time time NOT NULL,
+  end_time   time NOT NULL,
+  place      text NOT NULL DEFAULT '',
+  memo       text NOT NULL DEFAULT '',
+  created_by text NOT NULL REFERENCES members(uid),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE appointment_members (
+  appt_id    text REFERENCES appointments(id) ON DELETE CASCADE,
+  member_uid text REFERENCES members(uid),
+  PRIMARY KEY (appt_id, member_uid)
+);
+
 -- 행 단위 보안 -------------------------------------------------------------
 ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE members ENABLE ROW LEVEL SECURITY;
@@ -333,5 +371,26 @@ CREATE POLICY al_delete ON alerts FOR DELETE USING (from_uid = app.current_uid()
 CREATE POLICY ar_self   ON alert_recipients FOR SELECT USING (member_uid = app.current_uid());
 CREATE POLICY ar_sender ON alert_recipients FOR ALL USING ((SELECT from_uid FROM alerts WHERE id = alert_id) = app.current_uid());
 CREATE POLICY ar_mark   ON alert_recipients FOR UPDATE USING (member_uid = app.current_uid()) WITH CHECK (member_uid = app.current_uid());
+
+-- 공휴일·학사일정: 교사는 읽고 관리자만 쓴다. 개인 약속: 함께하는 사람만 읽고 만든 사람만 고친다.
+ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
+ALTER TABLE acad_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE appointment_members ENABLE ROW LEVEL SECURITY;
+CREATE POLICY hol_read   ON holidays FOR SELECT USING (true);
+CREATE OR REPLACE FUNCTION app.appt_member(p_appt text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM appointment_members WHERE appt_id = p_appt AND member_uid = app.current_uid()) $$;
+CREATE OR REPLACE FUNCTION app.appt_owner(p_appt text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM appointments WHERE id = p_appt AND created_by = app.current_uid()) $$;
+CREATE POLICY acad_read  ON acad_events FOR SELECT USING (app.is_teacher(school_id));
+CREATE POLICY acad_admin ON acad_events FOR ALL USING (app.is_admin(school_id)) WITH CHECK (app.is_admin(school_id));
+CREATE POLICY ap_read    ON appointments FOR SELECT USING (app.is_teacher(school_id) AND (created_by = app.current_uid() OR app.appt_member(id)));
+CREATE POLICY ap_create  ON appointments FOR INSERT WITH CHECK (app.is_teacher(school_id) AND created_by = app.current_uid());
+CREATE POLICY ap_owner   ON appointments FOR UPDATE USING (created_by = app.current_uid());
+CREATE POLICY ap_del     ON appointments FOR DELETE USING (created_by = app.current_uid());
+CREATE POLICY apm_read   ON appointment_members FOR SELECT USING (member_uid = app.current_uid() OR app.appt_member(appt_id) OR app.appt_owner(appt_id));
+CREATE POLICY apm_owner  ON appointment_members FOR ALL USING (app.appt_owner(appt_id)) WITH CHECK (app.appt_owner(appt_id));
 
 -- 보존·파기: 졸업·전출 학생의 행동 기록 등은 학교 보존 기준에 맞춰 정기 삭제한다(기간은 학교·교육청 기준 확인).
