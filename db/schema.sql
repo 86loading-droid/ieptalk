@@ -213,6 +213,26 @@ CREATE TABLE tasks (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- 알림 띠(전화 예약·긴급회의·공지) ------------------------------------------
+CREATE TABLE alerts (
+  id         text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id  text NOT NULL REFERENCES schools(id),
+  type       text NOT NULL CHECK (type IN ('urgent', 'call', 'meeting', 'notice')),
+  title      text NOT NULL,
+  text       text NOT NULL DEFAULT '',
+  from_uid   text NOT NULL REFERENCES members(uid),
+  at         timestamptz NOT NULL DEFAULT now(),
+  room_id    text REFERENCES rooms(id) ON DELETE SET NULL,       -- 기록이 남는 대화방
+  meeting_id text REFERENCES meetings(id) ON DELETE SET NULL
+);
+CREATE TABLE alert_recipients (
+  alert_id   text REFERENCES alerts(id) ON DELETE CASCADE,
+  member_uid text REFERENCES members(uid),
+  ack_at     timestamptz,                       -- 확인(깜박임 끔)
+  hidden_at  timestamptz,                       -- 띠에서 삭제(대화방 기록은 남음)
+  PRIMARY KEY (alert_id, member_uid)
+);
+
 -- 행 단위 보안 -------------------------------------------------------------
 ALTER TABLE schools ENABLE ROW LEVEL SECURITY;
 ALTER TABLE members ENABLE ROW LEVEL SECURITY;
@@ -300,5 +320,18 @@ CREATE POLICY tasks_read   ON tasks FOR SELECT USING (app.is_teacher(school_id))
 CREATE POLICY tasks_create ON tasks FOR INSERT WITH CHECK (app.is_teacher(school_id) AND created_by = app.current_uid());
 CREATE POLICY tasks_edit   ON tasks FOR UPDATE USING (assignee = app.current_uid() OR created_by = app.current_uid());
 CREATE POLICY tasks_del    ON tasks FOR DELETE USING (assignee = app.current_uid() OR created_by = app.current_uid());
+
+-- 알림: 받는 사람은 자기 행의 확인·삭제 표시만, 보낸 사람은 전체
+ALTER TABLE alerts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE alert_recipients ENABLE ROW LEVEL SECURITY;
+CREATE OR REPLACE FUNCTION app.alert_recipient(p_alert text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER AS $$
+  SELECT EXISTS (SELECT 1 FROM alert_recipients WHERE alert_id = p_alert AND member_uid = app.current_uid()) $$;
+CREATE POLICY al_read   ON alerts FOR SELECT USING (app.is_teacher(school_id) AND (from_uid = app.current_uid() OR app.alert_recipient(id)));
+CREATE POLICY al_create ON alerts FOR INSERT WITH CHECK (app.is_teacher(school_id) AND from_uid = app.current_uid());
+CREATE POLICY al_delete ON alerts FOR DELETE USING (from_uid = app.current_uid());
+CREATE POLICY ar_self   ON alert_recipients FOR SELECT USING (member_uid = app.current_uid());
+CREATE POLICY ar_sender ON alert_recipients FOR ALL USING ((SELECT from_uid FROM alerts WHERE id = alert_id) = app.current_uid());
+CREATE POLICY ar_mark   ON alert_recipients FOR UPDATE USING (member_uid = app.current_uid()) WITH CHECK (member_uid = app.current_uid());
 
 -- 보존·파기: 졸업·전출 학생의 행동 기록 등은 학교 보존 기준에 맞춰 정기 삭제한다(기간은 학교·교육청 기준 확인).
