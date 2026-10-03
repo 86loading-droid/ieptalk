@@ -435,3 +435,27 @@ input:focus, select:focus, textarea:focus { border-color: var(--primary); }
 button.notice-btn { background: var(--danger-soft); color: var(--danger); border-color: #F2C2B9; font-weight: 600; }
 button.notice-btn:hover { border-color: var(--danger); }
 .seg3 span { padding: .5rem .8rem; }
+
+/* ---------- 달력: 공휴일·학사일정·개인 약속 ---------- */
+:root { --appt: #8A3F74; --appt-soft: #F7E8F1; --hol: #B4382B; --hol-soft: #FFF4F1; }
+.wk .sun, .cell.sun .dnum, .cell.hol .dnum { color: var(--hol); }
+.wk .sat, .cell.sat .dnum { color: var(--sky); }
+.cell.hol { background: var(--hol-soft); }
+.cell.today .dnum { color: var(--sun-ink); }
+.dtop { display: flex; align-items: baseline; gap: .25rem; min-width: 0; }
+.hol-name { font-size: .62rem; font-weight: 600; color: var(--hol); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev.acad { background: var(--warn-soft); color: var(--warn); opacity: 1; }
+.ev.appt { background: var(--appt-soft); color: var(--appt); opacity: 1; }
+.tag.acad { background: var(--warn-soft); color: var(--warn); }
+.tag.appt { background: var(--appt-soft); color: var(--appt); }
+.tag.hol { background: var(--hol-soft); color: var(--hol); border: 1px solid #F3CFC7; }
+.mcard.acad { border-left-color: var(--warn); }
+.mcard.appt { border-left-color: var(--appt); }
+.cal-legend { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .55rem; }
+.lg-chip { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: var(--text); padding: .2rem .6rem; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); cursor: pointer; }
+.lg-chip input { width: 16px; height: 16px; margin: 0; }
+.lg-chip .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.k-hol .sw { background: var(--hol); } .k-acad .sw { background: var(--warn); } .k-mt .sw { background: var(--primary); } .k-appt .sw { background: var(--appt); }
+.hol-note { color: var(--hol); background: var(--hol-soft); padding: .3rem .55rem; border-radius: 8px; margin: .3rem 0; }
+.hol-list { color: var(--hol); margin: .5rem 0 0; }
+@media (max-width: 520px) { .hol-name { display: none; } .ev.acad, .ev.appt { opacity: 1; } }
