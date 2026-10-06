@@ -104,7 +104,10 @@ CREATE TABLE targets (                          -- 표적행동(조작적 정의
   definition         text NOT NULL,
   examples           text NOT NULL DEFAULT '',
   non_examples       text NOT NULL DEFAULT '',
-  method             text NOT NULL DEFAULT 'freq' CHECK (method IN ('freq', 'dur')),
+  method             text NOT NULL DEFAULT 'freq' CHECK (method IN ('freq', 'dur', 'int', 'lat')),  -- 빈도, 지속시간, 간격기록·순간표집, 잠재시간
+  int_type           text CHECK (int_type IN ('partial', 'whole', 'momentary')),
+  interval_sec       int,
+  intervals          int,
   session_min        int  NOT NULL DEFAULT 40,
   baseline_start     date,
   intervention_start date,                      -- 비어 있으면 기초선(A), 있으면 이날부터 중재(B)
@@ -117,7 +120,12 @@ CREATE TABLE bevents (                          -- 행동 기록(즉시 기록 �
   school_id   text NOT NULL REFERENCES schools(id),
   student_id  text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
   target_id   text NOT NULL REFERENCES targets(id) ON DELETE CASCADE,
-  type        text NOT NULL CHECK (type IN ('freq', 'dur', 'session')),  -- session = 관찰했고 발생 없음
+  type        text NOT NULL CHECK (type IN ('freq', 'dur', 'session', 'int', 'lat')),  -- session = 관찰했고 발생 없음
+  ioa         boolean NOT NULL DEFAULT false,   -- 두 번째 관찰자(관찰자 간 일치도용) 기록. 그래프에서 뺀다
+  results     boolean[],                        -- 간격기록: 간격별 발생 여부(null = 답하지 않음)
+  interval_sec int,
+  restraint   boolean NOT NULL DEFAULT false,   -- 물리적 제지가 있었음
+  incident_id text,                             -- 연결된 위기행동 사후 기록
   at          timestamptz NOT NULL,
   end_at      timestamptz,                      -- 지속시간 기록의 끝
   d           date NOT NULL,                    -- 회기(날짜)
@@ -392,5 +400,73 @@ CREATE POLICY ap_owner   ON appointments FOR UPDATE USING (created_by = app.curr
 CREATE POLICY ap_del     ON appointments FOR DELETE USING (created_by = app.current_uid());
 CREATE POLICY apm_read   ON appointment_members FOR SELECT USING (member_uid = app.current_uid() OR app.appt_member(appt_id) OR app.appt_owner(appt_id));
 CREATE POLICY apm_owner  ON appointment_members FOR ALL USING (app.appt_owner(appt_id)) WITH CHECK (app.appt_owner(appt_id));
+
+-- 위기행동 사후 기록 ---------------------------------------------------
+CREATE TABLE incidents (
+  id            text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  school_id     text NOT NULL REFERENCES schools(id),
+  student_id    text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  event_id      text REFERENCES bevents(id) ON DELETE SET NULL,
+  d date NOT NULL, t time, place text NOT NULL DEFAULT '',
+  antecedent text NOT NULL DEFAULT '', behavior text NOT NULL DEFAULT '', prevent text NOT NULL DEFAULT '',
+  restraint boolean NOT NULL DEFAULT false, restraint_method text NOT NULL DEFAULT '', r_start time, r_end time,
+  injury_student text NOT NULL DEFAULT '', injury_staff text NOT NULL DEFAULT '',
+  reported_at timestamptz, reported_to text NOT NULL DEFAULT '', notified_at timestamptz, notify_method text NOT NULL DEFAULT '',
+  debrief_date date, debrief_notes text NOT NULL DEFAULT '', hypothesis text NOT NULL DEFAULT '',
+  bsp_change text CHECK (bsp_change IN ('', 'yes', 'no')), actions text NOT NULL DEFAULT '', closed boolean NOT NULL DEFAULT false,
+  created_by text NOT NULL REFERENCES members(uid), created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE incident_attendees (incident_id text REFERENCES incidents(id) ON DELETE CASCADE, member_uid text REFERENCES members(uid), PRIMARY KEY (incident_id, member_uid));
+ALTER TABLE schools ADD COLUMN debrief_days int NOT NULL DEFAULT 2 CHECK (debrief_days BETWEEN 0 AND 10);  -- 팀 회고 기한(수업일). 법정 수치 아님
+ALTER TABLE schools ADD COLUMN review_n int NOT NULL DEFAULT 3;
+ALTER TABLE schools ADD COLUMN review_days int NOT NULL DEFAULT 30;
+
+-- 평가조정 한 장 -----------------------------------------------------------
+CREATE TABLE accommodations (
+  id text PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  student_id text NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  subject text NOT NULL,
+  presentation text[] NOT NULL DEFAULT '{}', response text[] NOT NULL DEFAULT '{}', timing text[] NOT NULL DEFAULT '{}', setting text[] NOT NULL DEFAULT '{}', scheduling text[] NOT NULL DEFAULT '{}',
+  other text NOT NULL DEFAULT '', modification boolean NOT NULL DEFAULT false, mod_note text NOT NULL DEFAULT '',
+  created_by text REFERENCES members(uid), updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE accommodation_shares (accom_id text REFERENCES accommodations(id) ON DELETE CASCADE, member_uid text REFERENCES members(uid), confirmed_at timestamptz, PRIMARY KEY (accom_id, member_uid));
+CREATE TABLE accommodation_effects (id bigserial PRIMARY KEY, accom_id text REFERENCES accommodations(id) ON DELETE CASCADE, d date NOT NULL, by_uid text REFERENCES members(uid), note text NOT NULL);
+
+-- 접근 기록(고치거나 지울 수 없음) ----------------------------------------
+CREATE TABLE access_log (
+  id bigserial PRIMARY KEY, school_id text NOT NULL REFERENCES schools(id),
+  uid text NOT NULL REFERENCES members(uid), student_id text, action text NOT NULL CHECK (action IN ('view', 'create', 'edit', 'delete', 'print')),
+  what text NOT NULL DEFAULT '', at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_attendees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accommodations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accommodation_shares ENABLE ROW LEVEL SECURITY;
+ALTER TABLE accommodation_effects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE access_log ENABLE ROW LEVEL SECURITY;
+CREATE POLICY ic_teacher ON incidents FOR SELECT USING (app.is_teacher(school_id));
+CREATE POLICY ic_insert  ON incidents FOR INSERT WITH CHECK (app.is_teacher(school_id) AND created_by = app.current_uid());
+CREATE POLICY ic_update  ON incidents FOR UPDATE USING (app.is_teacher(school_id));
+CREATE POLICY ic_delete  ON incidents FOR DELETE USING (created_by = app.current_uid() OR app.is_admin(school_id));
+CREATE POLICY ica_teacher ON incident_attendees FOR ALL USING (app.is_teacher((SELECT school_id FROM incidents WHERE id = incident_id)));
+CREATE POLICY acc_teacher ON accommodations FOR ALL USING (app.is_teacher((SELECT school_id FROM students WHERE id = student_id)));
+CREATE POLICY accs_teacher ON accommodation_shares FOR ALL USING (app.is_teacher((SELECT s.school_id FROM accommodations a JOIN students s ON s.id = a.student_id WHERE a.id = accom_id)));
+CREATE POLICY acce_teacher ON accommodation_effects FOR ALL USING (app.is_teacher((SELECT s.school_id FROM accommodations a JOIN students s ON s.id = a.student_id WHERE a.id = accom_id)));
+CREATE POLICY log_insert ON access_log FOR INSERT WITH CHECK (uid = app.current_uid() AND app.my_role(school_id) IS NOT NULL);
+CREATE POLICY log_read   ON access_log FOR SELECT USING (app.is_admin(school_id));
+-- 접근 기록에는 UPDATE·DELETE 정책을 두지 않는다(행 단위 보안이 켜져 있으면 정책이 없는 동작은 모두 거부된다).
+
+-- 내 책상(교사 개인 시간표·메모·D-Day 별표) -----------------------------
+CREATE TABLE teacher_desks (
+  uid text PRIMARY KEY REFERENCES members(uid) ON DELETE CASCADE,
+  periods jsonb NOT NULL DEFAULT '[]',   -- [["09:00","09:40"], ...]
+  cells jsonb NOT NULL DEFAULT '{}',     -- {"요일-교시": "과목 학급"}, 요일 1=월
+  lunch jsonb, memo text NOT NULL DEFAULT '', stars text[] NOT NULL DEFAULT '{}',  -- 별표한 학사일정 id
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE teacher_desks ENABLE ROW LEVEL SECURITY;
+CREATE POLICY desk_own ON teacher_desks FOR ALL USING (uid = app.current_uid()) WITH CHECK (uid = app.current_uid());
 
 -- 보존·파기: 졸업·전출 학생의 행동 기록 등은 학교 보존 기준에 맞춰 정기 삭제한다(기간은 학교·교육청 기준 확인).
