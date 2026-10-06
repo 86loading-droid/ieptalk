@@ -553,9 +553,9 @@ button.notice-btn:hover { border-color: var(--danger); }
 .w-title .go { color: var(--muted); font-size: 1.2rem; }
 .w-title .ghost.sm { min-height: 30px; padding: .1rem .55rem; font-size: .8rem; }
 .w-nav { display: flex; gap: .2rem; }
-.w-clock { grid-column: span 3; } .w-now { grid-column: span 5; } .w-dday { grid-column: span 4; }
-.w-month { grid-column: span 6; } .w-task { grid-column: span 3; } .w-memo { grid-column: span 3; }
-.w-week { grid-column: span 8; } .w-acad { grid-column: span 4; }
+.w-clock { grid-column: span 3; } .w-now { grid-column: span 5; } .w-weather { grid-column: span 4; }
+.w-meal { grid-column: span 4; } .w-dday { grid-column: span 4; } .w-memo { grid-column: span 4; }
+.w-week { grid-column: span 7; } .w-month { grid-column: span 5; } .w-task { grid-column: span 6; } .w-acad { grid-column: span 6; }
 /* 시계 */
 .w-clock { background: linear-gradient(160deg, #FFFFFF 0%, var(--surface-2) 100%); }
 .clock-time { font-family: var(--font-display); font-size: clamp(2.4rem, 5vw, 3.4rem); line-height: 1; margin: .5rem 0 .3rem; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
@@ -606,15 +606,54 @@ button.notice-btn:hover { border-color: var(--danger); }
 .tt tr.lunch td { background: transparent; color: var(--muted); font-size: .76rem; padding: .15rem; }
 .tt.edit { table-layout: auto; } .tt.edit td { background: none; padding: 0; } .tt.edit input { width: 100%; min-width: 4.5rem; font-size: .85rem; padding: .3rem; }
 .board-sub { font-family: var(--font-display); font-weight: 400; font-size: 1.15rem; margin: .2rem 0 .7rem; color: var(--muted); }
-@media (max-width: 1180px) {
+
+/* ---------- v14: 날씨·급식 위젯, 교사 컴퓨터용 좌우 배열 ---------- */
+.desk-wrap { container-type: inline-size; }
+/* 날씨 */
+.w-weather { background: linear-gradient(170deg, #FFFFFF 0%, #F1F5EC 100%); }
+.wx-main { display: flex; align-items: center; gap: .7rem; margin: .2rem 0 .3rem; }
+.wx-ico { font-size: 2.3rem; line-height: 1; }
+.wx-temp { font-family: var(--font-display); font-size: 2.3rem; line-height: 1; margin-right: .4rem; font-variant-numeric: tabular-nums; }
+.wx-desc { font-size: 1.05rem; color: var(--text); }
+.wx-sub { margin: .15rem 0; font-size: .86rem; color: var(--muted); }
+.wx-air { display: flex; gap: .35rem; flex-wrap: wrap; margin: .35rem 0 .2rem; }
+.air { font-size: .78rem; font-weight: 700; padding: .1rem .5rem; border-radius: 99px; }
+.air.g1 { background: #E3F0FA; color: #1F5A8C; } .air.g2 { background: var(--ok-soft); color: var(--ok); } .air.g3 { background: var(--warn-soft); color: var(--warn); } .air.g4 { background: var(--danger-soft); color: var(--danger); }
+.tiny { font-size: .72rem; margin: .35rem 0 0; }
+/* 급식 */
+.w-meal { background: #FFFBF1; }
+.meal-head { display: flex; align-items: center; justify-content: space-between; gap: .3rem; margin-bottom: .3rem; }
+.meal-head .ghost.sm { min-height: 30px; padding: .05rem .55rem; }
+.meal-tabs { display: flex; gap: .3rem; margin-bottom: .3rem; }
+.chip-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: .1rem .65rem; font-size: .8rem; min-height: 30px; cursor: pointer; }
+.chip-btn.on { background: var(--primary); color: #fff; border-color: var(--primary); }
+.meal-list { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 1rem; }
+.meal-list li { break-inside: avoid; padding: .15rem 0; font-size: .92rem; border-bottom: 1px dotted var(--line); }
+.allergy { font-size: .68rem; color: var(--muted); }
+/* 위젯 묶음은 실제로 차지한 폭에 맞춰 칸 수를 바꾼다(화면 배율 125%·150%에서도 맞도록) */
+@container (max-width: 860px) {
   .desk { grid-template-columns: repeat(6, minmax(0, 1fr)); }
-  .w-clock { grid-column: span 2; } .w-now { grid-column: span 4; } .w-dday, .w-task, .w-memo, .w-acad { grid-column: span 3; }
-  .w-month, .w-week { grid-column: span 6; }
+  .w-clock { grid-column: span 2; } .w-now { grid-column: span 4; }
+  .w-weather, .w-meal, .w-dday, .w-memo, .w-task, .w-acad { grid-column: span 3; }
+  .w-week, .w-month { grid-column: span 6; }
 }
-@media (max-width: 640px) {
+@container (max-width: 560px) {
   .desk { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .desk > .widget { grid-column: auto; }
-  .w-now { order: -2; } .w-clock { order: -1; } .w-week { order: 0; }
+  .w-now { order: -3; } .w-weather { order: -2; } .w-meal { order: -1; }
   .clock-time { font-size: 2.2rem; } .now-title { font-size: 1.4rem; }
   .m-cell { min-height: 42px; } .m-ev { display: none; } .m-cell:has(.m-ev) .m-d::after { content: '•'; color: var(--warn); margin-left: 2px; }
+  .meal-list { columns: 1; }
+}
+/* 교사 컴퓨터: 왼쪽 내 책상, 오른쪽 학생 지원·협업(세로로 따로 스크롤) */
+.today-layout { display: block; }
+@media (min-width: 1280px) {
+  main:has(.today-layout) { max-width: 1880px; }
+  .today-layout { display: grid; grid-template-columns: minmax(0, 1fr) clamp(320px, 27vw, 440px); gap: 20px; align-items: start; }
+  .today-side { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; padding: 0 4px 1rem 0; scrollbar-gutter: stable; }
+  .today-side .board { column-width: auto; column-count: 1; }
+}
+@media (min-width: 1760px) {
+  .today-layout { grid-template-columns: minmax(0, 1fr) minmax(600px, 36%); }
+  .today-side .board { column-count: 2; }
 }
