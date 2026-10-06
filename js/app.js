@@ -66,7 +66,7 @@ function shell(content) {
       <button type="button" class="ghost sm" data-act="signout">${S.store.mode === 'demo' ? '사용자 바꾸기' : '로그아웃'}</button>
     </div>
   </header>
-  ${netBanner()}${alertsBar()}
+  ${netBanner()}${S.route?.name === 'today' || !VIEWS[S.route?.name] ? '' : alertsBar()}
   <nav class="sidenav" aria-label="주 메뉴">${links}</nav>
   <main id="main" tabindex="-1">${content}</main>
   <nav class="tabbar" aria-label="주 메뉴(하단)">${links}</nav>`;
