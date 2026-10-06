@@ -55,6 +55,8 @@ service cloud.firestore {
 
         match /goals/{gid} { allow read, write: if isTeacher(); }
         match /memos/{mid} { allow read, write: if isTeacher(); }
+        // 평가조정 한 장: 교사만(공유받은 교사의 확인 표시 포함)
+        match /accoms/{aid} { allow read, write: if isTeacher(); }
         match /targets/{tid} {
           allow read: if isTeacher() || assignedAide(sid);
           allow write: if isTeacher();
@@ -125,6 +127,28 @@ service cloud.firestore {
           && request.resource.data.ack.diff(resource.data.ack).affectedKeys().hasOnly([request.auth.uid])
           && request.resource.data.hidden.diff(resource.data.hidden).affectedKeys().hasOnly([request.auth.uid]);
         allow delete: if isTeacher() && resource.data.from == request.auth.uid;
+      }
+
+      // 위기행동 사후 기록: 교사만 읽고 쓴다. 지우기는 작성자나 관리자만.
+      match /incidents/{iid} {
+        allow read, create, update: if isTeacher();
+        allow delete: if isTeacher() && (resource.data.createdBy == request.auth.uid || isAdmin());
+      }
+
+      // 접근 기록: 구성원은 자기 이름으로 새 기록만 남기고, 관리자만 읽는다. 아무도 고치거나 지우지 못한다.
+      match /access/{lid} {
+        allow create: if isMember() && request.resource.data.uid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['uid', 'sid', 'action', 'what', 'at'])
+          && request.resource.data.action in ['view', 'create', 'edit', 'delete', 'print'];
+        allow read: if isAdmin();
+        allow update, delete: if false;
+      }
+
+      // 내 책상(개인 시간표·메모·D-Day 별표): 본인만 읽고 쓴다. 문서 이름이 곧 본인 uid
+      match /desks/{uid} {
+        allow read: if isMember() && resource.data.owner == request.auth.uid;
+        allow create, update: if isMember() && uid == request.auth.uid && request.resource.data.owner == request.auth.uid;
+        allow delete: if false;
       }
 
       // 할 일: 교사끼리
