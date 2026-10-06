@@ -127,9 +127,9 @@ export function render() {
      <p class="sub">내가 공유한 평가조정</p><ul class="mini">${shared.map(({ s, a }) => { const n = (a.sharedWith || []).length, k = (a.sharedWith || []).filter((u) => a.confirms?.[u]).length; return `<li><a class="grow" href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><span class="tag ${k === n ? 'ok' : ''}">확인 ${k}/${n}</span></li>`; }).join('') || '<li class="muted">공유한 평가조정이 없습니다.</li>'}</ul>`);
 
   return `<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
-  ${deskWidgets(taskBody)}
-  <h2 class="board-sub">학생 지원·협업</h2>
-  <div class="board">${pRec}${pWarn}${pCrisis}${pDeadline}${pCal}${pChat}${pAcc}${pStu}${pMemo}${pAdmin}</div>`;
+  <div class="today-layout"><div class="today-main">${deskWidgets(taskBody)}</div>
+  <aside class="today-side" aria-label="학생 지원·협업"><h2 class="board-sub">학생 지원·협업</h2>
+  <div class="board">${pRec}${pWarn}${pCrisis}${pDeadline}${pCal}${pChat}${pAcc}${pStu}${pMemo}${pAdmin}</div></aside></div>`;
 }
 
 on('task-done', async (el) => { await S.store.update('tasks', {}, el.dataset.id, { done: el.checked, doneAt: Date.now() }); });

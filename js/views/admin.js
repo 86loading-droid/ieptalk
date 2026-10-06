@@ -2,7 +2,8 @@
 import { esc, toast } from '../util.js';
 import { S, on, rerender, ROLE_LABEL, avatar, teachers, aides, nameOf, student } from '../state.js';
 import { ACTION_LABEL, KIND_LABEL } from '../access.js';
-import { fmtDateTime } from '../util.js';
+import { fmtDateTime, toast as toast2 } from '../util.js';
+import { DEFAULT_PLACE, findSchool, resetPlaceCache } from './widgets.js';
 import { demoSeed, defaultSchool } from '../store.js';
 import { confirmInline } from './record.js';
 import { botMembers } from './bots.js';
@@ -45,6 +46,15 @@ export function render() {
         <label>재검토 제안 건수<input type="number" name="reviewN" min="2" max="10" value="${esc(sc.reviewN ?? 3)}"></label>
         <label>재검토 기간(일)<input type="number" name="reviewDays" min="7" max="120" value="${esc(sc.reviewDays ?? 30)}"></label></div>
         <p class="small muted">회고 기한은 법정 수치가 없어 학교가 정하는 값입니다. 정한 기간 안 사후 기록이 기준 건수 이상이면 행동지원계획 재검토를 제안합니다.</p></fieldset>
+      <fieldset><legend>첫 화면 급식·날씨</legend>
+        <div class="row3"><label>급식 학교 이름<input name="mealSchoolName" value="${esc(sc.mealSchoolName || DEFAULT_PLACE.mealSchoolName)}"></label>
+        <label>교육청 코드<input name="mealOffice" value="${esc(sc.mealOffice || DEFAULT_PLACE.mealOffice)}"></label>
+        <label>학교 코드<input name="mealSchool" value="${esc(sc.mealSchool || DEFAULT_PLACE.mealSchool)}"></label></div>
+        <p class="small"><button type="button" class="ghost sm" data-act="find-school">학교 이름으로 코드 찾기(NEIS)</button> <span class="muted" data-school-hits></span></p>
+        <div class="row3"><label>날씨 지역 이름<input name="wxName" value="${esc(sc.wxName || DEFAULT_PLACE.wxName)}"></label>
+        <label>위도<input name="wxLat" inputmode="decimal" value="${esc(sc.wxLat ?? DEFAULT_PLACE.wxLat)}"></label>
+        <label>경도<input name="wxLon" inputmode="decimal" value="${esc(sc.wxLon ?? DEFAULT_PLACE.wxLon)}"></label></div>
+        <p class="small muted">급식은 NEIS 교육정보 개방 포털, 날씨는 Open-Meteo 공개 예보를 브라우저에서 바로 불러옵니다. 학생 정보는 보내지 않습니다.</p></fieldset>
       <button type="submit" class="primary">저장</button>
     </form>
   </section>
@@ -87,9 +97,22 @@ document.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const patch = Object.fromEntries(fd.entries()); patch.warnRun = Number(patch.warnRun) || 3;
+    patch.wxLat = Number(patch.wxLat) || DEFAULT_PLACE.wxLat; patch.wxLon = Number(patch.wxLon) || DEFAULT_PLACE.wxLon; resetPlaceCache();
     patch.debriefDays = Math.max(0, Number(patch.debriefDays) || 0); patch.reviewN = Number(patch.reviewN) || 3; patch.reviewDays = Number(patch.reviewDays) || 30;
     await S.store.saveSchool(patch); toast('학사일정을 저장했습니다');
   }
+});
+on('find-school', async (el) => {
+  const f = el.closest('form'); const out = f.querySelector('[data-school-hits]');
+  const name = f.querySelector('[name="mealSchoolName"]').value.trim(); if (!name) return;
+  out.textContent = '찾는 중…';
+  try {
+    const hits = await findSchool(name);
+    if (!hits.length) { out.textContent = '찾지 못했습니다. 학교 이름을 정확히 적어 주세요.'; return; }
+    const h = hits[0];
+    f.querySelector('[name="mealOffice"]').value = h.office; f.querySelector('[name="mealSchool"]').value = h.code; f.querySelector('[name="mealSchoolName"]').value = h.name;
+    out.textContent = `${h.name}(${h.kind}) · ${h.addr}${hits.length > 1 ? ` 외 ${hits.length - 1}곳` : ''} — 저장을 눌러 주세요`;
+  } catch { out.textContent = '조회하지 못했습니다(인터넷 연결 확인).'; toast2('학교 코드 조회 실패'); }
 });
 on('acc-log-filter', (el) => { S.ui.accLog = el.value; rerender(); });
 on('inv-del', async (el) => { if (!confirmInline(el)) return; await S.store.remove('invites', {}, el.dataset.id); });

@@ -3,6 +3,7 @@
 import { esc, todayStr, fmtDate, addDays, diffDays, parseDate, openModal, toast } from '../util.js';
 import { S, on, rerender, nameOf } from '../state.js';
 import { HOLIDAYS } from '../holidays.js';
+import { weatherBody, mealBody, DEFAULT_PLACE } from './widgets.js';
 
 const DAYS = ['월', '화', '수', '목', '금'];
 const WEEK = ['일', '월', '화', '수', '목', '금', '토'];
@@ -107,16 +108,19 @@ export function deskWidgets(pTaskBody) {
   const mg = monthGrid();
   const acad = acadUpcoming();
   const star = (a) => `<button type="button" class="star ${stars().includes(a.id) ? 'on' : ''}" data-act="desk-star" data-id="${a.id}" aria-pressed="${stars().includes(a.id)}" aria-label="${esc(a.title)} D-Day ${stars().includes(a.id) ? '해제' : '설정'}">${stars().includes(a.id) ? '★' : '☆'}</button>`;
-  return `<div class="desk">
+  const mealName = S.school.mealSchoolName || DEFAULT_PLACE.mealSchoolName;
+  return `<div class="desk-wrap"><div class="desk">
     ${w('w-clock', '시계', '', `<div data-live="clock">${clockBody()}</div>`)}
     ${w('w-now', '지금 이 시간', '', `<div data-live="now">${nowBody()}</div>`)}
+    ${w('w-weather', '지금 날씨', '', `<div data-fill="weather">${weatherBody()}</div>`)}
+    ${w('w-meal', `급식 <small class="muted">${esc(mealName)}</small>`, '', `<div data-fill="meal">${mealBody()}</div>`)}
     ${w('w-dday', 'D-Day', '#/calendar', `<ul class="dd-list">${dd.slice(0, 4).map((a) => { const n = diffDays(a.date, todayStr()); return `<li><span class="dd-n ${n <= 7 ? 'soon' : ''}">${n === 0 ? 'D-day' : `D-${n}`}</span><span class="grow">${esc(a.title)}</span><small>${esc(fmtDate(a.date))}</small></li>`; }).join('') || '<li class="muted small">학사일정 옆 ☆을 누르면 D-Day로 표시됩니다.</li>'}</ul>`)}
-    ${w('w-month', esc(mg.head), '#/calendar', mg.html, `<span class="w-nav"><button type="button" class="ghost sm" data-act="desk-month" data-d="-1" aria-label="이전 달">‹</button><button type="button" class="ghost sm" data-act="desk-month" data-d="0">오늘</button><button type="button" class="ghost sm" data-act="desk-month" data-d="1" aria-label="다음 달">›</button></span>`)}
-    ${w('w-task', '할 일', '#/tasks', pTaskBody)}
     ${w('w-memo', '메모', '', `<textarea class="desk-memo" data-desk-memo aria-label="내 메모" placeholder="나만 보는 메모. 쓰는 대로 저장됩니다.">${esc(desk().memo || '')}</textarea><p class="small muted memo-state" aria-live="polite">${desk().updatedAt ? '저장됨' : ''}</p>`)}
     ${w('w-week', '주간 시간표', '', weekTable(), '<button type="button" class="ghost sm" data-act="tt-edit">시간표 편집</button>')}
+    ${w('w-month', esc(mg.head), '#/calendar', mg.html, `<span class="w-nav"><button type="button" class="ghost sm" data-act="desk-month" data-d="-1" aria-label="이전 달">‹</button><button type="button" class="ghost sm" data-act="desk-month" data-d="0">오늘</button><button type="button" class="ghost sm" data-act="desk-month" data-d="1" aria-label="다음 달">›</button></span>`)}
+    ${w('w-task', '할 일', '#/tasks', pTaskBody)}
     ${w('w-acad', '학사일정', '#/calendar', `<ul class="acad-list">${acad.slice(0, 7).map((a) => `<li>${star(a)}<span class="grow"><b>${esc(a.title)}</b><small>${esc(fmtDate(a.date))}${a.endDate && a.endDate !== a.date ? ' ~ ' + esc(fmtDate(a.endDate)) : ''}</small></span></li>`).join('') || '<li class="muted small">다가오는 학사일정이 없습니다.</li>'}</ul>`)}
-  </div>`;
+  </div></div>`;
 }
 
 on('desk-star', (el) => { const id = el.dataset.id; const s = stars(); saveDesk({ stars: s.includes(id) ? s.filter((x) => x !== id) : [...s, id] }); rerender(); });
