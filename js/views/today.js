@@ -10,6 +10,7 @@ import { crisisPostItems, crisisPostBody } from './incidents.js';
 import { accomsOf, needsMyConfirm } from './accoms.js';
 import { deskWidgets } from './desk.js';
 import { alertsBar } from './alerts.js';
+import { layoutOf, toolbar, editBar, editing } from './layout.js';
 
 export function deadlines(sc) {
   const list = [];
@@ -22,9 +23,16 @@ export function deadlines(sc) {
 }
 
 // 담벼락의 한 칸. 제목이 곧 세부 화면으로 가는 길
-const post = (tone, href, title, count, body, extra = '') => `<section class="post ${tone}">
-  <h2 class="post-title">${href ? `<a href="${href}">` : '<span>'}${esc(title)}${count != null ? ` <span class="cnt">${count}</span>` : ''}${href ? '<span class="go" aria-hidden="true">›</span></a>' : '</span>'}</h2>
-  <div class="post-body">${body}</div>${extra}</section>`;
+const post = (id, tone, href, title, count, body, extra = '') => ({ id, html: (it, i, n) => `<section class="post ${tone} ${editing() ? 'lay-edit' : ''}" data-lay-zone="board" data-lay-id="${id}" ${editing() ? 'draggable="true"' : ''} ${it.h ? `data-h="${it.h}"` : ''}>
+  ${toolbar('board', it, i, n)}<h2 class="post-title">${href ? `<a href="${href}">` : '<span>'}${esc(it.title || title)}${count != null ? ` <span class="cnt">${count}</span>` : ''}${href ? '<span class="go" aria-hidden="true">›</span></a>' : '</span>'}</h2>
+  <div class="post-body">${body}</div>${extra}</section>` });
+
+// 오른쪽 칸들: 교사가 정한 순서·높이·이름으로, 숨긴 칸은 빼고 그린다
+function boardHtml(posts) {
+  const by = Object.fromEntries(posts.filter(Boolean).map((p) => [p.id, p]));
+  const list = layoutOf('board').filter((it) => !it.hidden && by[it.id]);
+  return list.map((it, i) => by[it.id].html(it, i, list.length)).join('') || '<p class="muted small">모든 칸을 숨겼습니다. 「화면 편집」에서 다시 넣을 수 있습니다.</p>';
+}
 
 const end = (m) => toMs(m.date, m.start) + (+m.minutes || 30) * 60000;
 
@@ -36,17 +44,17 @@ export function render() {
 
   // 1. 법정 기한
   const dl = deadlines(S.school).filter((d) => d.left >= 0).slice(0, 3);
-  const pDeadline = post('tone-sun', isAdmin() ? '#/admin' : '', 'IEP 법정 기한', null,
+  const pDeadline = post('deadline', 'tone-sun', isAdmin() ? '#/admin' : '', 'IEP 법정 기한', null,
     `<ul class="mini">${dl.map((d) => `<li><span class="dday ${d.left <= 7 ? 'soon' : ''}">D-${d.left}</span><span><b>${esc(d.label)}</b><small>${esc(fmtDate(d.due))}까지 · ${esc(d.basis)}</small></span></li>`).join('') || '<li class="muted">관리에서 학사일정을 넣으면 표시됩니다.</li>'}</ul>`);
 
   // 2. 진전도 경고
   const warns = stuList.flatMap((s) => warningsFor(s.id).map((g) => ({ s, g })));
-  const pWarn = post(warns.length ? 'tone-warn' : 'tone-plain', '#/students', '진전도 경고', warns.length,
+  const pWarn = post('warn', warns.length ? 'tone-warn' : 'tone-plain', '#/students', '진전도 경고', warns.length,
     `<ul class="mini">${warns.map(({ s, g }) => `<li><span><a href="#/student/${s.id}/goals"><b>${esc(s.alias)}</b> ${esc(g.domain)}</a><small>${esc(g.behavior)} · 최근 ${S.school.warnRun || 3}회 연속 목표선 아래</small></span>
       <button type="button" class="sm ghost" data-act="warn-meet-today" data-sid="${s.id}" data-dom="${esc(g.domain)}">회의 잡기</button></li>`).join('') || '<li class="muted">경고가 없습니다.</li>'}</ul>`);
 
   // 3. 학생·IEP
-  const pStu = post('tone-green', '#/students', '학생·IEP', S.students.length,
+  const pStu = post('stu', 'tone-green', '#/students', '학생·IEP', S.students.length,
     `<ul class="mini">${S.students.map((s) => {
       const gs = S.goalsBy[s.id] || []; const w = warningsFor(s.id).length; const miss = gs.filter((g) => goalMissing(g).length).length;
       return `<li class="stu-row"><a class="grow" href="#/student/${s.id}/goals"><b>${esc(s.alias)}</b> <small>${esc(s.grade || '')} · 목표 ${gs.length}${w ? ` · <span class="late">경고 ${w}</span>` : ''}${miss ? ` · 요소 빠짐 ${miss}` : ''}</small></a>
@@ -69,12 +77,12 @@ export function render() {
         <span class="rec-name">${esc(tg.name)}</span><span class="rec-sub">${run ? `끝내기 <span data-timer="${run.start}">0:00</span>` : `오늘 ${cnt} · ${tg.interventionStart ? '중재' : `기초선 ${st.n}회기`}`}</span></button>`;
     }).join('')}</div>`;
   }).join('');
-  const pRec = post('tone-rec', '#/behavior', '행동 기록', null, recRows || '<p class="muted">표적행동을 정하면 여기에 바로 누르는 버튼이 생깁니다.</p>');
+  const pRec = post('rec', 'tone-rec', '#/behavior', '행동 기록', null, recRows || '<p class="muted">표적행동을 정하면 여기에 바로 누르는 버튼이 생깁니다.</p>');
 
   // 5. 메신저
   const rooms = [...S.rooms].sort((a, b) => (roomLast(b).lastAt || 0) - (roomLast(a).lastAt || 0)).slice(0, 6);
   const unread = S.rooms.filter(isUnread).length;
-  const pChat = post('tone-sky', '#/chat', '메신저', unread || null,
+  const pChat = post('chat', 'tone-sky', '#/chat', '메신저', unread || null,
     `<ul class="mini">${rooms.map((r) => { const l = roomLast(r); return `<li><a class="grow room-mini" href="#/chat/${r.id}">${isUnread(r) ? '<span class="dot-new" aria-label="안 읽음"></span>' : ''}<b>${esc(roomTitle(r))}</b><small class="ellip">${esc(l.lastText || '')}</small></a><small class="muted">${l.lastAt ? relTime(l.lastAt) : ''}</small></li>`; }).join('') || '<li class="muted">대화가 없습니다.</li>'}</ul>`,
     `<div class="post-foot"><button type="button" class="sm notice-btn" data-act="notice-new" data-type="urgent">긴급회의 공지</button><button type="button" class="sm ghost" data-act="call-new">전화 예약</button><button type="button" class="sm ghost" data-act="notice-new" data-type="notice">단체 공지</button><button type="button" class="sm ghost" data-act="room-new">새 대화</button></div>`);
 
@@ -89,7 +97,7 @@ export function render() {
     ...S.acad.filter((a) => (a.endDate || a.date) >= t && a.date <= t14).map((a) => ({ d: a.date < t ? t : a.date, s: a.start || '', k: 'acad', tag: '학사', title: a.title, when: `${fmtDate(a.date)}${a.endDate && a.endDate !== a.date ? ' ~ ' + fmtDate(a.endDate) : ''}${a.start ? ' ' + a.start : ''}` })),
     ...S.appts.filter((p) => p.date >= t && p.date <= t14).map((p) => ({ d: p.date, s: p.start, k: 'appt', tag: '약속', title: p.title, when: `${fmtDate(p.date)} ${p.start}` }))
   ].sort((a, b) => (a.d + a.s > b.d + b.s ? 1 : -1)).slice(0, 6);
-  const pCal = post('tone-violet', '#/calendar', '일정·예약', pending.length || null,
+  const pCal = post('cal', 'tone-violet', '#/calendar', '일정·예약', pending.length || null,
     `${pending.length ? `<p class="sub">응답할 초대</p><ul class="mini">${pending.map((m) => mRow(m, true)).join('')}</ul>` : ''}
      <p class="sub">다가오는 일정(2주)</p><ul class="mini">${mine.map((m) => mRow(m, false)).join('') || '<li class="muted">예정된 일정이 없습니다.</li>'}</ul>
      ${soon.length ? `<p class="sub">학사일정·약속·공휴일(2주)</p><ul class="mini">${soon.map((x) => `<li><span class="tag ${x.k}">${x.tag}</span><span class="grow"><b>${esc(x.title)}</b><small>${esc(x.when)}</small></span></li>`).join('')}</ul>` : ''}`,
@@ -100,16 +108,16 @@ export function render() {
   const given = S.tasks.filter((k) => k.createdBy === S.me.uid && k.assignee !== S.me.uid && !k.done);
   const taskRow = (k, mineTask) => `<li><label class="chk grow"><input type="checkbox" data-act="task-done" data-id="${k.id}"> <span>${esc(k.title)}<small class="${k.due && k.due < t ? 'late' : ''}">${k.due ? fmtDate(k.due) + '까지' : ''}${mineTask ? '' : ` · ${esc(nameOf(k.assignee))}`}</small></span></label>${k.roomId ? `<a class="link sm" href="#/chat/${k.roomId}">대화</a>` : ''}</li>`;
   const taskBody = `<ul class="mini">${tasks.map((k) => taskRow(k, true)).join('') || '<li class="muted">남은 할 일이 없습니다.</li>'}</ul>${given.length ? `<p class="sub">내가 부탁한 일</p><ul class="mini">${given.map((k) => taskRow(k, false)).join('')}</ul>` : ''}<div class="post-foot"><button type="button" class="sm ghost" data-act="task-new">할 일 추가</button></div>`;
-  const pTask = post('tone-plain', '#/tasks', '할 일', tasks.length,
+  const pTask = post('task', 'tone-plain', '#/tasks', '할 일', tasks.length,
     `<ul class="mini">${tasks.map((k) => taskRow(k, true)).join('') || '<li class="muted">남은 할 일이 없습니다.</li>'}</ul>${given.length ? `<p class="sub">내가 부탁한 일</p><ul class="mini">${given.map((k) => taskRow(k, false)).join('')}</ul>` : ''}`,
     `<div class="post-foot"><button type="button" class="sm ghost" data-act="task-new">할 일 추가</button></div>`);
 
   // 8. 공유 메모
-  const pMemo = post('tone-plain', stuList[0] ? `#/student/${stuList[0].id}/memo` : '#/students', '공유 메모', null,
+  const pMemo = post('memo', 'tone-plain', stuList[0] ? `#/student/${stuList[0].id}/memo` : '#/students', '공유 메모', null,
     `<p class="small muted">학생마다 교사들이 함께 고치는 메모(회의 안건, 행동 관찰 양식)입니다.</p><ul class="mini">${stuList.map((s) => `<li><a href="#/student/${s.id}/memo"><b>${esc(s.alias)}</b> 메모 열기</a></li>`).join('')}</ul>`);
 
   // 9. 관리(관리자만)
-  const pAdmin = isAdmin() ? post('tone-plain', '#/admin', '관리', null,
+  const pAdmin = isAdmin() ? post('admin', 'tone-plain', '#/admin', '관리', null,
     `<ul class="mini"><li><span>교사 <b>${teachers().length}</b>명 · 보조인력 <b>${aides().length}</b>명</span></li>
       <li><span>로그인 기다리는 초대 <b>${S.invites.filter((i) => !S.members.some((m) => m.email === i.id)).length}</b>건</span></li>
       <li><span>진전도 경고 기준: 연속 ${S.school.warnRun || 3}회</span></li></ul>`,
@@ -118,19 +126,19 @@ export function render() {
   // 10. 위기행동 사후 기록
   const ci = crisisPostItems(stuList);
   const firstCrisis = ci.flagged[0]?.s.id || ci.open[0]?.ic.studentId || stuList[0]?.id;
-  const pCrisis = post(ci.flagged.length || ci.open.length ? 'tone-warn' : 'tone-plain', firstCrisis ? `#/student/${firstCrisis}/crisis` : '#/students', '위기행동 사후 기록', (ci.flagged.length + ci.open.length) || null, crisisPostBody(ci));
+  const pCrisis = post('crisis', ci.flagged.length || ci.open.length ? 'tone-warn' : 'tone-plain', firstCrisis ? `#/student/${firstCrisis}/crisis` : '#/students', '위기행동 사후 기록', (ci.flagged.length + ci.open.length) || null, crisisPostBody(ci));
 
   // 11. 평가조정 확인 요청(공유받은 것)과 내가 공유한 것의 확인 현황
   const toConfirm = S.students.flatMap((s) => accomsOf(s.id).filter(needsMyConfirm).map((a) => ({ s, a })));
   const shared = S.students.flatMap((s) => accomsOf(s.id).filter((a) => a.createdBy === S.me.uid && (a.sharedWith || []).length).map((a) => ({ s, a })));
-  const pAcc = post(toConfirm.length ? 'tone-sky' : 'tone-plain', toConfirm[0] ? `#/student/${toConfirm[0].s.id}/accom` : stuList[0] ? `#/student/${stuList[0].id}/accom` : '#/students', '평가조정 한 장', toConfirm.length || null,
+  const pAcc = post('acc', toConfirm.length ? 'tone-sky' : 'tone-plain', toConfirm[0] ? `#/student/${toConfirm[0].s.id}/accom` : stuList[0] ? `#/student/${stuList[0].id}/accom` : '#/students', '평가조정 한 장', toConfirm.length || null,
     `${toConfirm.length ? `<p class="sub">확인을 부탁받은 평가조정</p><ul class="mini">${toConfirm.map(({ s, a }) => `<li><span class="grow"><a href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><small>${esc(nameOf(a.createdBy))} 선생님이 공유</small></span><button type="button" class="sm primary" data-act="acc-confirm" data-sid="${s.id}" data-id="${a.id}">확인했어요</button></li>`).join('')}</ul>` : ''}
      <p class="sub">내가 공유한 평가조정</p><ul class="mini">${shared.map(({ s, a }) => { const n = (a.sharedWith || []).length, k = (a.sharedWith || []).filter((u) => a.confirms?.[u]).length; return `<li><a class="grow" href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><span class="tag ${k === n ? 'ok' : ''}">확인 ${k}/${n}</span></li>`; }).join('') || '<li class="muted">공유한 평가조정이 없습니다.</li>'}</ul>`);
 
-  return `${alertsBar('board')}<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
+  return `${alertsBar('board')}${editBar()}<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
   <div class="today-layout"><div class="today-main">${deskWidgets(taskBody)}</div>
   <aside class="today-side" aria-label="학생 지원·협업"><h2 class="board-sub">학생 지원·협업</h2>
-  <div class="board">${pRec}${pWarn}${pCrisis}${pDeadline}${pCal}${pChat}${pAcc}${pStu}${pMemo}${pAdmin}</div></aside></div>`;
+  <div class="board">${boardHtml([pRec, pWarn, pCrisis, pDeadline, pCal, pChat, pAcc, pStu, pMemo, pAdmin])}</div></aside></div>`;
 }
 
 on('task-done', async (el) => { await S.store.update('tasks', {}, el.dataset.id, { done: el.checked, doneAt: Date.now() }); });
