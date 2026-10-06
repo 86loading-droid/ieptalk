@@ -1,6 +1,8 @@
 // 관리 화면: 구글 계정 초대(역할 지정), 구성원 관리, 학사일정·경고 기준, 가상 학생 예시
 import { esc, toast } from '../util.js';
-import { S, on, rerender, ROLE_LABEL, avatar, teachers, aides } from '../state.js';
+import { S, on, rerender, ROLE_LABEL, avatar, teachers, aides, nameOf, student } from '../state.js';
+import { ACTION_LABEL, KIND_LABEL } from '../access.js';
+import { fmtDateTime } from '../util.js';
 import { demoSeed, defaultSchool } from '../store.js';
 import { confirmInline } from './record.js';
 import { botMembers } from './bots.js';
@@ -38,6 +40,11 @@ export function render() {
       <div class="row2"><label>1학기 시작<input type="date" name="sem1Start" value="${esc(sc.sem1Start)}"></label><label>1학기 끝<input type="date" name="sem1End" value="${esc(sc.sem1End)}"></label></div>
       <div class="row2"><label>2학기 시작<input type="date" name="sem2Start" value="${esc(sc.sem2Start)}"></label><label>2학기 끝<input type="date" name="sem2End" value="${esc(sc.sem2End)}"></label></div>
       <div class="row2"><label>근무시간 외 시작<input type="time" name="quietFrom" value="${esc(sc.quietFrom)}"></label><label>근무 시작<input type="time" name="quietTo" value="${esc(sc.quietTo)}"></label></div>
+      <fieldset><legend>위기행동 사후 기록</legend>
+        <div class="row3"><label>팀 회고 기한(수업일, 0은 안 씀)<input type="number" name="debriefDays" min="0" max="10" value="${esc(sc.debriefDays ?? 2)}"></label>
+        <label>재검토 제안 건수<input type="number" name="reviewN" min="2" max="10" value="${esc(sc.reviewN ?? 3)}"></label>
+        <label>재검토 기간(일)<input type="number" name="reviewDays" min="7" max="120" value="${esc(sc.reviewDays ?? 30)}"></label></div>
+        <p class="small muted">회고 기한은 법정 수치가 없어 학교가 정하는 값입니다. 정한 기간 안 사후 기록이 기준 건수 이상이면 행동지원계획 재검토를 제안합니다.</p></fieldset>
       <button type="submit" class="primary">저장</button>
     </form>
   </section>
@@ -53,8 +60,13 @@ export function render() {
       <button type="button" class="ghost sm danger" data-act="bots-remove">봇 지우기</button>`
     : '<button type="button" class="primary" data-act="bots-create">봇 교사 2명 만들기</button>'}
   </section>
+  <section class="card access-card"><h2 class="h3">접근 기록 <small class="muted">최근 ${Math.min(S.access.length, 40)}건 / 전체 ${S.access.length}건</small></h2>
+    <p class="small">누가 언제 어느 학생 자료를 열람·작성·수정·삭제·인쇄했는지 남습니다. 관리자만 볼 수 있고 아무도 고치거나 지울 수 없습니다.</p>
+    <label class="small">학생<select data-change="acc-log-filter"><option value="">전체</option>${S.students.map((x) => `<option value="${x.id}" ${S.ui.accLog === x.id ? 'selected' : ''}>${esc(x.alias)}</option>`).join('')}</select></label>
+    <ul class="rows">${S.access.filter((a) => !S.ui.accLog || a.sid === S.ui.accLog).slice(0, 40).map((a) => `<li><small class="time">${esc(fmtDateTime(a.at))}</small><span class="grow"><b>${esc(nameOf(a.uid))}</b> ${esc(student(a.sid)?.alias || '(지운 학생)')} · ${esc(KIND_LABEL[a.what] || a.what || '')} ${esc(ACTION_LABEL[a.action] || a.action)}</span></li>`).join('') || '<li class="muted">아직 기록이 없습니다.</li>'}</ul>
+  </section>
   <section class="card"><h2 class="h3">시연 자료</h2>
-    <p class="small">가상 학생 3명(가명), IEP 목표, 표적행동, 기초선 기록을 넣습니다. 지금 구성원 중 교사·보조인력이 팀과 기록 담당으로 자동 배정됩니다.</p>
+    <p class="small">가상 학생 3명(가명), IEP 목표, 표적행동(빈도·지속시간·간격기록·잠재시간), 기초선 기록, 위기행동 사후 기록과 평가조정 예시를 넣습니다. 지금 구성원 중 교사·보조인력이 팀과 기록 담당으로 자동 배정됩니다.</p>
     <button type="button" class="ghost" data-act="seed">가상 학생 예시 넣기</button>
     <button type="button" class="ghost" data-act="seed-cal">학사일정·개인 약속 예시 넣기</button>
     ${S.acad.some((a) => a.sample) || S.appts.some((p) => p.sample) ? '<button type="button" class="ghost danger" data-act="unseed-cal">일정 예시 지우기</button>' : ''}
@@ -75,9 +87,11 @@ document.addEventListener('submit', async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const patch = Object.fromEntries(fd.entries()); patch.warnRun = Number(patch.warnRun) || 3;
+    patch.debriefDays = Math.max(0, Number(patch.debriefDays) || 0); patch.reviewN = Number(patch.reviewN) || 3; patch.reviewDays = Number(patch.reviewDays) || 30;
     await S.store.saveSchool(patch); toast('학사일정을 저장했습니다');
   }
 });
+on('acc-log-filter', (el) => { S.ui.accLog = el.value; rerender(); });
 on('inv-del', async (el) => { if (!confirmInline(el)) return; await S.store.remove('invites', {}, el.dataset.id); });
 on('mem-role', async (el) => { await S.store.update('members', {}, el.dataset.id, { role: el.value }); toast('역할을 바꿨습니다'); });
 on('mem-title', async (el) => { await S.store.update('members', {}, el.dataset.id, { title: el.value }); toast('직책을 저장했습니다'); });
@@ -94,6 +108,8 @@ on('seed', async (el) => {
     for (const [sid, gs] of Object.entries(sd.goals)) for (const g of gs) { const { id, ...d } = g; await S.store.create('goals', { sid: map[sid] }, { ...d, createdBy: S.me.uid, createdAt: Date.now() }); }
     for (const [sid, ts] of Object.entries(sd.targets)) for (const t of ts) { const { id, ...d } = t; tmap[id] = await S.store.create('targets', { sid: map[sid] }, { ...d, createdBy: S.me.uid, createdAt: Date.now() }); }
     for (const ev of sd.bevents) { const { id, ...d } = ev; await S.store.create('bevents', {}, { ...d, studentId: map[ev.studentId], targetId: tmap[ev.targetId], createdBy: S.me.uid }); }
+    for (const ic of sd.incidents) { const { id, ...d } = ic; await S.store.create('incidents', {}, { ...d, studentId: map[ic.studentId], createdBy: S.me.uid }); }
+    for (const [sid, as] of Object.entries(sd.accoms)) for (const a of as) { const { id, ...d } = a; await S.store.create('accoms', { sid: map[sid] }, { ...d, createdBy: S.me.uid, updatedBy: S.me.uid }); }
     toast('가상 학생 예시를 넣었습니다');
   } finally { el.disabled = false; rerender(); }
 });

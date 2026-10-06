@@ -6,6 +6,9 @@ import { openMeetingModal } from './calendar.js';
 import { roomTitle, isUnread, roomLast } from './chat.js';
 import { behaviorSeries, baselineStats } from '../charts.js';
 import { HOLIDAYS } from '../holidays.js';
+import { crisisPostItems, crisisPostBody } from './incidents.js';
+import { accomsOf, needsMyConfirm } from './accoms.js';
+import { deskWidgets } from './desk.js';
 
 export function deadlines(sc) {
   const list = [];
@@ -58,8 +61,9 @@ export function render() {
       const key = `${s.id}:${tg.id}`; const run = S.running[key];
       const todays = evs.filter((e) => e.targetId === tg.id && e.date === t && e.type !== 'session');
       const st = baselineStats(behaviorSeries(tg, evs));
-      const cnt = tg.method === 'dur' ? fmtDur(todays.reduce((a, e) => a + ((e.end || e.at) - e.at) / 1000, 0)) : `${todays.length}회`;
-      const act = tg.method === 'dur' ? (run ? 'rec-stop' : 'rec-start') : 'rec-tap';
+      const prim = todays.filter((e) => !e.ioa);
+      const cnt = tg.method === 'dur' ? fmtDur(prim.reduce((a, e) => a + ((e.end || e.at) - e.at) / 1000, 0)) : tg.method === 'int' ? `${prim.length}회기` : tg.method === 'lat' ? `${prim.length}번 지시` : `${prim.length}회`;
+      const act = tg.method === 'int' ? 'int-open' : tg.method === 'lat' ? (run ? 'lat-stop' : 'rec-start') : tg.method === 'dur' ? (run ? 'rec-stop' : 'rec-start') : 'rec-tap';
       return `<button type="button" class="rec-btn mini ${run ? 'running' : ''}" data-act="${act}" data-sid="${s.id}" data-tid="${tg.id}" aria-label="${esc(s.alias)} ${esc(tg.name)} ${run ? '기록 끝내기' : '기록'}">
         <span class="rec-name">${esc(tg.name)}</span><span class="rec-sub">${run ? `끝내기 <span data-timer="${run.start}">0:00</span>` : `오늘 ${cnt} · ${tg.interventionStart ? '중재' : `기초선 ${st.n}회기`}`}</span></button>`;
     }).join('')}</div>`;
@@ -94,6 +98,7 @@ export function render() {
   const tasks = S.tasks.filter((k) => k.assignee === S.me.uid && !k.done).sort((a, b) => (a.due > b.due ? 1 : -1));
   const given = S.tasks.filter((k) => k.createdBy === S.me.uid && k.assignee !== S.me.uid && !k.done);
   const taskRow = (k, mineTask) => `<li><label class="chk grow"><input type="checkbox" data-act="task-done" data-id="${k.id}"> <span>${esc(k.title)}<small class="${k.due && k.due < t ? 'late' : ''}">${k.due ? fmtDate(k.due) + '까지' : ''}${mineTask ? '' : ` · ${esc(nameOf(k.assignee))}`}</small></span></label>${k.roomId ? `<a class="link sm" href="#/chat/${k.roomId}">대화</a>` : ''}</li>`;
+  const taskBody = `<ul class="mini">${tasks.map((k) => taskRow(k, true)).join('') || '<li class="muted">남은 할 일이 없습니다.</li>'}</ul>${given.length ? `<p class="sub">내가 부탁한 일</p><ul class="mini">${given.map((k) => taskRow(k, false)).join('')}</ul>` : ''}<div class="post-foot"><button type="button" class="sm ghost" data-act="task-new">할 일 추가</button></div>`;
   const pTask = post('tone-plain', '#/tasks', '할 일', tasks.length,
     `<ul class="mini">${tasks.map((k) => taskRow(k, true)).join('') || '<li class="muted">남은 할 일이 없습니다.</li>'}</ul>${given.length ? `<p class="sub">내가 부탁한 일</p><ul class="mini">${given.map((k) => taskRow(k, false)).join('')}</ul>` : ''}`,
     `<div class="post-foot"><button type="button" class="sm ghost" data-act="task-new">할 일 추가</button></div>`);
@@ -109,8 +114,22 @@ export function render() {
       <li><span>진전도 경고 기준: 연속 ${S.school.warnRun || 3}회</span></li></ul>`,
     `<div class="post-foot"><a class="sm btn-link" href="#/admin">초대·역할·학사일정</a></div>`) : '';
 
+  // 10. 위기행동 사후 기록
+  const ci = crisisPostItems(stuList);
+  const firstCrisis = ci.flagged[0]?.s.id || ci.open[0]?.ic.studentId || stuList[0]?.id;
+  const pCrisis = post(ci.flagged.length || ci.open.length ? 'tone-warn' : 'tone-plain', firstCrisis ? `#/student/${firstCrisis}/crisis` : '#/students', '위기행동 사후 기록', (ci.flagged.length + ci.open.length) || null, crisisPostBody(ci));
+
+  // 11. 평가조정 확인 요청(공유받은 것)과 내가 공유한 것의 확인 현황
+  const toConfirm = S.students.flatMap((s) => accomsOf(s.id).filter(needsMyConfirm).map((a) => ({ s, a })));
+  const shared = S.students.flatMap((s) => accomsOf(s.id).filter((a) => a.createdBy === S.me.uid && (a.sharedWith || []).length).map((a) => ({ s, a })));
+  const pAcc = post(toConfirm.length ? 'tone-sky' : 'tone-plain', toConfirm[0] ? `#/student/${toConfirm[0].s.id}/accom` : stuList[0] ? `#/student/${stuList[0].id}/accom` : '#/students', '평가조정 한 장', toConfirm.length || null,
+    `${toConfirm.length ? `<p class="sub">확인을 부탁받은 평가조정</p><ul class="mini">${toConfirm.map(({ s, a }) => `<li><span class="grow"><a href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><small>${esc(nameOf(a.createdBy))} 선생님이 공유</small></span><button type="button" class="sm primary" data-act="acc-confirm" data-sid="${s.id}" data-id="${a.id}">확인했어요</button></li>`).join('')}</ul>` : ''}
+     <p class="sub">내가 공유한 평가조정</p><ul class="mini">${shared.map(({ s, a }) => { const n = (a.sharedWith || []).length, k = (a.sharedWith || []).filter((u) => a.confirms?.[u]).length; return `<li><a class="grow" href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><span class="tag ${k === n ? 'ok' : ''}">확인 ${k}/${n}</span></li>`; }).join('') || '<li class="muted">공유한 평가조정이 없습니다.</li>'}</ul>`);
+
   return `<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
-  <div class="board">${pRec}${pWarn}${pDeadline}${pCal}${pChat}${pStu}${pTask}${pMemo}${pAdmin}</div>`;
+  ${deskWidgets(taskBody)}
+  <h2 class="board-sub">학생 지원·협업</h2>
+  <div class="board">${pRec}${pWarn}${pCrisis}${pDeadline}${pCal}${pChat}${pAcc}${pStu}${pMemo}${pAdmin}</div>`;
 }
 
 on('task-done', async (el) => { await S.store.update('tasks', {}, el.dataset.id, { done: el.checked, doneAt: Date.now() }); });

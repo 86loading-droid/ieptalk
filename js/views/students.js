@@ -1,7 +1,10 @@
 // 학생 목록과 학생별 IEP(목표·진전도), 행동 기초선, 공유 메모
 import { esc, todayStr, fmtDate, addDays, openModal, toast, newId } from '../util.js';
 import { S, on, rerender, useSub, go, teachers, aides, nameOf, labelOf, avatar, student, isTeacher } from '../state.js';
-import { progressChart, progressWarning, behaviorChart, behaviorSeries, baselineStats } from '../charts.js';
+import { progressChart, progressWarning, behaviorChart, behaviorSeries, baselineStats, ioaDays, METHOD_LABEL, INT_LABEL } from '../charts.js';
+import { crisisTab, incidentDates, reviewWarning } from './incidents.js';
+import { accomTab, accomsOf, needsMyConfirm } from './accoms.js';
+import { logAccess } from '../access.js';
 import { recordCard, eventRow, confirmInline, ANTECEDENTS, CONSEQUENCES } from './record.js';
 import { openMeetingModal } from './calendar.js';
 import { openStudentRoom } from './chat.js';
@@ -21,7 +24,7 @@ export function warningsFor(sid) {
 }
 
 export function render(route) {
-  if (route.name === 'student' && route.args[0]) return detail(route.args[0], route.args[1] || 'goals');
+  if (route.name === 'student' && route.args[0]) return detail(route.args[0], route.args[1] || 'goals', route.args.slice(2));
   const cards = S.students.map((s) => {
     const w = warningsFor(s.id).length;
     const gs = S.goalsBy[s.id] || [];
@@ -37,11 +40,13 @@ export function render(route) {
     <div class="grid">${cards || '<section class="card"><p>아직 학생이 없습니다. 「학생 추가」를 누르거나 관리 화면에서 가상 학생 예시를 넣으세요.</p></section>'}</div>`;
 }
 
-function detail(sid, tab) {
+function detail(sid, tab, args = []) {
   const s = student(sid);
   if (!s) return '<section class="card"><p>학생을 찾을 수 없습니다.</p><a href="#/students">목록으로</a></section>';
-  const tabs = [['goals', 'IEP 목표·진전도'], ['behavior', '행동·기초선'], ['memo', '공유 메모']];
-  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'memo' ? memoTab(s) : goalsTab(s);
+  const nAcc = accomsOf(sid).filter(needsMyConfirm).length;
+  const tabs = [['goals', 'IEP 목표·진전도'], ['behavior', '행동·기초선'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모']];
+  logAccess(sid, 'view', tab === 'goals' ? 'goals_tab' : tab);
+  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : goalsTab(s);
   return `<a class="back" href="#/students">‹ 학생 목록</a>
   <div class="page-head"><h1>${esc(s.alias)} <small class="muted">${esc(s.grade || '')}</small></h1>
     <div class="btns"><button type="button" class="ghost" data-act="stu-room" data-sid="${sid}">팀 대화방</button>
@@ -143,10 +148,10 @@ function behaviorTab(s) {
     const freq = (key) => { const c = {}; tevs.forEach((e) => { if (e[key]) c[e[key]] = (c[e[key]] || 0) + 1; }); return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${esc(k)} ${v}`).join(', ') || '자료 없음'; };
     const recent = [...evs.filter((e) => e.targetId === t.id)].sort((a, b) => b.at - a.at).slice(0, 8);
     return `<section class="card">
-      <div class="goal-head"><h2 class="h3">${esc(t.name)} <small class="muted">${t.method === 'dur' ? '지속시간' : '빈도'} · 회기 ${esc(t.sessionMin || 40)}분</small></h2><span class="grow"></span>
+      <div class="goal-head"><h2 class="h3">${esc(t.name)} <small class="muted">${METHOD_LABEL[t.method] || '빈도'}${t.method === 'int' ? ` · ${INT_LABEL[t.intType || 'partial']} ${esc(t.intervalSec || 10)}초 × ${esc(t.intervals || 30)}칸` : ''} · 회기 ${esc(t.sessionMin || 40)}분</small></h2><span class="grow"></span>
         <button type="button" class="ghost sm" data-act="tgt-edit" data-sid="${s.id}" data-tid="${t.id}">정의 수정</button></div>
       <p class="small"><b>조작적 정의</b> ${esc(t.definition || '-')}</p>
-      ${behaviorChart(t, series)}
+      ${behaviorChart(t, series, incidentDates(s.id))}
       <div class="stats">
         <div class="stat ${enough[0]}"><span>기초선 회기</span><b>${st.n || 0}</b><small>${enough[1]}</small></div>
         <div class="stat"><span>평균</span><b>${st.mean ?? '-'}</b><small>중앙값 ${st.median ?? '-'}</small></div>
@@ -154,7 +159,8 @@ function behaviorTab(s) {
         <div class="stat"><span>안정성(참고)</span><b>${st.n ? st.within + '%' : '-'}</b><small>중앙값 ±20% 안에 든 회기 비율</small></div>
       </div>
       <p class="small muted">안정성 판정은 그래프와 함께 교사가 합니다. 자료점 기준은 WWC 단일대상설계 기준(단계당 3개 이상, 5개 이상 권장)을 따릅니다.</p>
-      <div class="hyp"><p class="small"><b>기능 가설 도움(자주 나온 상황)</b><br>앞: ${freq('antecedent')}<br>뒤: ${freq('consequence')}</p></div>
+      ${ioaPanel(t, evs, series)}
+      ${['int', 'lat'].includes(t.method) ? '' : `<div class="hyp"><p class="small"><b>기능 가설 도움(자주 나온 상황)</b><br>앞: ${freq('antecedent')}<br>뒤: ${freq('consequence')}</p></div>`}
       <div class="btns">${t.interventionStart
         ? `<span class="tag ok">${esc(fmtDate(t.interventionStart))}부터 중재(B)</span><button type="button" class="ghost sm" data-act="tgt-phase-reset" data-sid="${s.id}" data-tid="${t.id}">기초선으로 되돌리기</button>`
         : `<button type="button" class="primary sm" data-act="tgt-phase" data-sid="${s.id}" data-tid="${t.id}" ${st.n < 3 ? 'aria-describedby="need3"' : ''}>기초선 확정·중재 시작</button>${st.n < 3 ? '<small id="need3" class="muted">3회기 이상 모은 뒤 권장</small>' : ''}`}
@@ -162,9 +168,27 @@ function behaviorTab(s) {
       <details><summary>최근 기록(누구나 기록한 것 전체)</summary><ul class="rows">${recent.map((e) => eventRow(e, { showStudent: false, showBy: true })).join('') || '<li class="muted">없음</li>'}</ul></details>
     </section>`;
   }).join('');
+  const rw = reviewWarning(s.id);
   return `<div class="bar"><button type="button" class="primary" data-act="tgt-new" data-sid="${s.id}">표적행동 정하기</button>
     <span class="muted small">표적행동을 정하면 교사와 배정된 보조인력의 휴대폰에 즉시 기록 버튼이 생깁니다.</span></div>
+    ${rw ? `<div class="alert warn" role="alert"><span>최근 ${rw.days}일 위기행동 사후 기록 ${rw.cnt}건(기준 ${rw.n}건). 행동지원계획 재검토를 권합니다.</span><a class="btn-link sm" href="#/student/${s.id}/crisis">사후 기록 보기</a></div>` : ''}
     ${recordCard(s, targets, evs)}${blocks || ''}`;
+}
+
+// 관찰자 간 일치도: WWC 단일대상설계 기준(일치도 .80 이상, 단계마다 회기의 20% 이상에서 수집)에 비추어 보여 준다
+function ioaPanel(t, evs, series) {
+  const days = ioaDays(t, evs);
+  const nA = series.filter((p) => p.phase === 'A').length, nB = series.filter((p) => p.phase === 'B').length;
+  const inA = days.filter((d) => !t.interventionStart || d.d < t.interventionStart).length, inB = days.length - inA;
+  const valid = days.filter((d) => d.pct != null);
+  const avg = valid.length ? Math.round(valid.reduce((a, d) => a + d.pct, 0) / valid.length) : null;
+  const cover = (k, n) => (n ? Math.round((k / n) * 100) : 0);
+  const okAvg = avg != null && avg >= 80, okA = cover(inA, nA) >= 20, okB = !nB || cover(inB, nB) >= 20;
+  return `<details class="ioa" ${days.length ? 'open' : ''}><summary>관찰자 간 일치도 ${days.length ? `<span class="tag ${okAvg ? 'ok' : 'warn'}">평균 ${avg ?? '-'}%</span>` : '<span class="tag">자료 없음</span>'}</summary>
+    ${days.length ? `<table class="ioa-table"><thead><tr><th>날짜</th><th>주 관찰자</th><th>두 번째 관찰자</th><th>일치도(${esc(days[0].how)})</th></tr></thead><tbody>${days.slice(-8).map((d) => `<tr><td>${esc(fmtDate(d.d))}</td><td>${esc(d.a)}</td><td>${esc(d.b)} <small class="muted">${d.by.map(nameOf).map(esc).join(', ')}</small></td><td><b class="${d.pct != null && d.pct >= 80 ? 'ok-t' : 'warn-t'}">${d.pct ?? '-'}%</b></td></tr>`).join('')}</tbody></table>
+      <p class="small">기초선 ${nA}회기 중 ${inA}회기(${cover(inA, nA)}%)${nB ? `, 중재 ${nB}회기 중 ${inB}회기(${cover(inB, nB)}%)` : ''}에서 일치도를 냈습니다. ${okAvg && okA && okB ? '기준을 충족합니다.' : '기준(평균 80% 이상, 단계마다 회기의 20% 이상)에 아직 못 미칩니다.'}</p>`
+      : '<p class="small muted">같은 시간에 다른 선생님이나 보조인력이 「두 번째 관찰자로 기록」을 켜고 따로 기록하면 날마다 일치도를 계산합니다.</p>'}
+    <p class="small muted">기준: WWC 단일대상설계 기준(Kratochwill 외, 2010) — 일치도 .80 이상, 단계마다 회기의 20% 이상.</p></details>`;
 }
 
 function targetForm(t = {}) {
@@ -172,16 +196,22 @@ function targetForm(t = {}) {
     <label>행동 이름(버튼에 표시)<input name="name" value="${esc(t.name || '')}" required maxlength="20" placeholder="예: 소리 지르기"></label>
     <label>조작적 정의(보이고 셀 수 있게)<textarea name="definition" rows="2" required placeholder="예: 수업 중 다른 사람이 들을 만큼 큰 소리를 1초 이상 내는 행동">${esc(t.definition || '')}</textarea></label>
     <div class="row2"><label>해당하는 예<input name="examples" value="${esc(t.examples || '')}"></label><label>해당하지 않는 예<input name="nonExamples" value="${esc(t.nonExamples || '')}"></label></div>
-    <div class="row2"><label>측정 방법<select name="method"><option value="freq" ${t.method !== 'dur' ? 'selected' : ''}>빈도(한 번 누르면 1회)</option><option value="dur" ${t.method === 'dur' ? 'selected' : ''}>지속시간(시작·끝 누름)</option></select></label>
+    <div class="row2"><label>측정 방법<select name="method" data-method>${[['freq', '빈도(한 번 누르면 1회)'], ['dur', '지속시간(시작·끝 누름)'], ['int', '간격기록·순간표집(신호마다 예/아니오)'], ['lat', '잠재시간(지시 → 행동 시작까지)']].map(([v, l]) => `<option value="${v}" ${(t.method || 'freq') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label>회기(관찰) 시간(분)<input type="number" name="sessionMin" min="1" value="${esc(t.sessionMin || 40)}"></label></div>
+    <div class="row3 int-only" ${t.method === 'int' ? '' : 'hidden'}><label>간격 방식<select name="intType">${Object.entries(INT_LABEL).map(([v, l]) => `<option value="${v}" ${(t.intType || 'partial') === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+      <label>간격(초)<input type="number" name="intervalSec" min="5" max="600" value="${esc(t.intervalSec || 10)}"></label><label>칸 수<input type="number" name="intervals" min="2" max="120" value="${esc(t.intervals || 30)}"></label></div>
+    <p class="small muted int-only" ${t.method === 'int' ? '' : 'hidden'}>부분간격은 한 번이라도 일어나면, 전체간격은 간격 내내 이어지면, 순간표집은 간격이 끝나는 순간에 하고 있으면 「예」입니다. 자주 일어나 일일이 세기 어려운 행동에 씁니다.</p>
+    <p class="small muted lat-only" ${t.method === 'lat' ? '' : 'hidden'}>지시를 준 순간 버튼을 누르고, 학생이 지시한 행동을 시작하면 다시 누릅니다. 반응이 없으면 「반응 없음」으로 끝냅니다.</p>
     <label>기초선 시작일<input type="date" name="baselineStart" value="${esc(t.baselineStart || todayStr())}"></label>
     <div class="actions">${t.id ? '<button type="button" class="danger ghost" data-del>삭제</button>' : ''}<span class="grow"></span><button type="button" class="ghost" data-close>취소</button><button type="submit" class="primary">저장</button></div></form>`;
 }
-const targetData = (fd) => ({ name: fd.get('name'), definition: fd.get('definition'), examples: fd.get('examples'), nonExamples: fd.get('nonExamples'), method: fd.get('method'), sessionMin: Number(fd.get('sessionMin')) || 40, baselineStart: fd.get('baselineStart'), updatedAt: Date.now() });
-on('tgt-new', (el) => { const sid = el.dataset.sid; openModal(targetForm(), { wide: true, onSubmit: async (fd) => { await S.store.create('targets', { sid }, { ...targetData(fd), phase: 'baseline', interventionStart: '', createdBy: S.me.uid, createdAt: Date.now() }); toast('표적행동을 정했습니다. 기록 버튼이 생겼습니다.'); } }); });
+const targetData = (fd) => ({ name: fd.get('name'), definition: fd.get('definition'), examples: fd.get('examples'), nonExamples: fd.get('nonExamples'), method: fd.get('method'), sessionMin: Number(fd.get('sessionMin')) || 40, baselineStart: fd.get('baselineStart'),
+  intType: fd.get('intType') || 'partial', intervalSec: Number(fd.get('intervalSec')) || 10, intervals: Number(fd.get('intervals')) || 30, updatedAt: Date.now() });
+const bindTargetForm = (m) => { const sel = m.querySelector('[data-method]'); const upd = () => { m.querySelectorAll('.int-only').forEach((x) => (x.hidden = sel.value !== 'int')); m.querySelectorAll('.lat-only').forEach((x) => (x.hidden = sel.value !== 'lat')); }; sel.addEventListener('change', upd); upd(); };
+on('tgt-new', (el) => { const sid = el.dataset.sid; openModal(targetForm(), { wide: true, onOpen: bindTargetForm, onSubmit: async (fd) => { await S.store.create('targets', { sid }, { ...targetData(fd), phase: 'baseline', interventionStart: '', createdBy: S.me.uid, createdAt: Date.now() }); toast('표적행동을 정했습니다. 기록 버튼이 생겼습니다.'); } }); });
 on('tgt-edit', (el) => {
   const { sid, tid } = el.dataset; const t = (S.targetsBy[sid] || []).find((x) => x.id === tid);
-  openModal(targetForm(t), { wide: true, onOpen: (m) => { const d = m.querySelector('[data-del]'); d.onclick = async () => { if (!confirmInline(d)) return; await S.store.remove('targets', { sid }, tid); m.closest('.modal-back').remove(); toast('표적행동을 지웠습니다(기록은 남습니다)'); }; }, onSubmit: async (fd) => { await S.store.update('targets', { sid }, tid, targetData(fd)); toast('저장했습니다'); } });
+  openModal(targetForm(t), { wide: true, onOpen: (m) => { bindTargetForm(m); const d = m.querySelector('[data-del]'); d.onclick = async () => { if (!confirmInline(d)) return; await S.store.remove('targets', { sid }, tid); m.closest('.modal-back').remove(); toast('표적행동을 지웠습니다(기록은 남습니다)'); }; }, onSubmit: async (fd) => { await S.store.update('targets', { sid }, tid, targetData(fd)); toast('저장했습니다'); } });
 });
 on('tgt-phase', (el) => {
   const { sid, tid } = el.dataset;
