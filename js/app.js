@@ -12,6 +12,10 @@ import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
 import { alertsBar } from './views/alerts.js';
 import './views/acadImport.js';
+import './views/observe.js';
+import { maybeShowGuide } from './views/guide.js';
+import { netBanner } from './net.js';
+import { installAccessLog } from './access.js';
 
 const TEACHER_NAV = [
   ['today', '한눈에', 'M4 4h7v7H4zM13 4h7v4h-7zM13 10h7v10h-7zM4 13h7v7H4z'],
@@ -57,11 +61,12 @@ function shell(content) {
   <header class="topbar">
     <div class="brand"><span class="logo" aria-hidden="true">톡</span><span>${APP_NAME}</span>${S.store.mode === 'demo' ? '<span class="pill">데모</span>' : ''}</div>
     <div class="me">
+      <button type="button" class="ghost sm help-btn" data-act="guide-open" aria-label="도움말"><span class="lbl">도움말</span></button>
       ${avatar(S.me.uid)}<span class="me-name">${esc(S.me.name)}<small>${esc(S.me.title || ROLE_LABEL[S.me.role])}</small></span>
       <button type="button" class="ghost sm" data-act="signout">${S.store.mode === 'demo' ? '사용자 바꾸기' : '로그아웃'}</button>
     </div>
   </header>
-  ${alertsBar()}
+  ${netBanner()}${alertsBar()}
   <nav class="sidenav" aria-label="주 메뉴">${links}</nav>
   <main id="main" tabindex="-1">${content}</main>
   <nav class="tabbar" aria-label="주 메뉴(하단)">${links}</nav>`;
@@ -117,7 +122,10 @@ function syncStudentSubs() {
   for (const s of S.students) {
     if (studentSubs.has(s.id)) continue;
     const uns = [S.store.sub('targets', { sid: s.id }, (r) => { S.targetsBy[s.id] = r; rerender(); })];
-    if (isTeacher()) uns.push(S.store.sub('goals', { sid: s.id }, (r) => { S.goalsBy[s.id] = r; rerender(); }));
+    if (isTeacher()) {
+      uns.push(S.store.sub('goals', { sid: s.id }, (r) => { S.goalsBy[s.id] = r; rerender(); }));
+      uns.push(S.store.sub('accoms', { sid: s.id }, (r) => { S.accomsBy[s.id] = r; rerender(); }));
+    }
     studentSubs.set(s.id, uns);
   }
 }
@@ -133,7 +141,12 @@ function startGlobal() {
     st.sub('alerts', {}, (r) => { S.alerts = r; rerender(); });
     st.sub('acad', {}, (r) => { S.acad = r; rerender(); });
     st.sub('appts', {}, (r) => { S.appts = r; rerender(); });
-    if (isAdmin()) st.sub('invites', {}, (r) => { S.invites = r; rerender(); });
+    st.sub('incidents', {}, (r) => { S.incidents = r; rerender(); });
+    st.sub('desks', {}, (r) => { const mine = r.find((x) => x.id === S.me.uid) || null; const changed = JSON.stringify(mine) !== JSON.stringify(S.desk); S.desk = mine; if (changed && !document.activeElement?.matches?.('[data-desk-memo]')) rerender(); });
+    if (isAdmin()) {
+      st.sub('invites', {}, (r) => { S.invites = r; rerender(); });
+      st.sub('access', {}, (r) => { S.access = r.sort((a, b) => b.at - a.at); rerender(); });
+    }
   } else {
     st.sub('bevents', { mine: true }, (r) => { S.myEvents = r; rerender(); });
   }
@@ -172,12 +185,14 @@ on('demo-reset', () => { S.store.resetDemo(); toast('데모 자료를 처음 상
 
 async function boot() {
   S.store = await makeStore();
+  installAccessLog(S.store);
   let started = false;
   S.store.init((status, err) => {
     if (status !== 'ok') { S.me = null; return loginScreen(status, err); }
     S.me = S.store.me;
     if (!started) { started = true; startGlobal(); }
     render();
+    maybeShowGuide();
   });
   if (isDemo()) document.documentElement.dataset.demo = '1';
 }

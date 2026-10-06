@@ -12,6 +12,10 @@ const pathOf = (kind, p = {}) => ({
   goals: `schools/${S}/students/${p.sid}/goals`,
   targets: `schools/${S}/students/${p.sid}/targets`,
   memos: `schools/${S}/students/${p.sid}/memos`,
+  accoms: `schools/${S}/students/${p.sid}/accoms`,
+  incidents: `schools/${S}/incidents`,
+  access: `schools/${S}/access`,
+  desks: `schools/${S}/desks`,
   bevents: `schools/${S}/bevents`,
   rooms: `schools/${S}/rooms`,
   messages: `schools/${S}/rooms/${p.rid}/messages`,
@@ -32,6 +36,7 @@ function filtersFor(kind, p, me) {
   if (kind === 'rooms') return [['memberUids', 'array-contains', me.uid]];
   if (kind === 'alerts') return [['to', 'array-contains', me.uid]];
   if (kind === 'appts') return [['memberUids', 'array-contains', me.uid]];
+  if (kind === 'desks') return [['owner', '==', me.uid]];
   return [];
 }
 
@@ -114,7 +119,7 @@ const DEMO_USERS = [
 
 export function defaultSchool() {
   const y = new Date().getFullYear();
-  return { name: '데모초등학교', yearStart: `${y}-03-02`, sem1Start: `${y}-03-02`, sem1End: `${y}-07-18`, sem2Start: `${y}-08-18`, sem2End: `${y}-12-31`, warnRun: 3, quietFrom: '17:00', quietTo: '08:00' };
+  return { name: '데모초등학교', yearStart: `${y}-03-02`, sem1Start: `${y}-03-02`, sem1End: `${y}-07-18`, sem2Start: `${y}-08-18`, sem2End: `${y}-12-31`, warnRun: 3, quietFrom: '17:00', quietTo: '08:00', debriefDays: 2, reviewN: 3, reviewDays: 30 };
 }
 
 export function demoSeed(uids) {
@@ -142,8 +147,9 @@ export function demoSeed(uids) {
   const targets = {
     s1: [{ id: 'b1', name: '소리 지르기', definition: '수업 중 교실 안 다른 사람이 들을 수 있을 만큼 큰 소리로 1초 이상 소리를 내는 행동', examples: '과제 제시 후 「아아」 하고 크게 소리 냄', nonExamples: '노래 시간에 함께 노래함, 놀이 중 웃음', method: 'freq', sessionMin: 40, phase: 'baseline', baselineStart: addDays(t, base), interventionStart: '' }],
     s2: [{ id: 'b2', name: '자리 이탈', definition: '수업 중 허락 없이 엉덩이가 의자에서 떨어져 자리를 벗어나는 행동', examples: '활동 중 일어나 교실 뒤로 걸어감', nonExamples: '교사가 불러 앞으로 나옴', method: 'dur', sessionMin: 40, phase: 'baseline', baselineStart: addDays(t, -8), interventionStart: '' }],
-    s3: []
+    s3: [{ id: 'b3', name: '과제 참여', definition: '교사가 제시한 과제 자료를 보거나 손으로 다루고 있는 상태', examples: '활동지에 글씨를 씀, 교구를 손으로 옮김', nonExamples: '창밖을 봄, 책상에 엎드림', method: 'int', intType: 'momentary', intervalSec: 30, intervals: 20, sessionMin: 10, phase: 'baseline', baselineStart: addDays(t, -10), interventionStart: '' }]
   };
+  targets.s2.push({ id: 'b4', name: '지시 따르기 시작', definition: '교사가 한 단계 지시를 한 뒤 학생이 지시한 행동을 시작하기까지 걸린 시간', examples: '「책 펴세요」 뒤 책을 잡음', nonExamples: '지시 전에 이미 책을 폄', method: 'lat', sessionMin: 20, phase: 'baseline', baselineStart: addDays(t, -6), interventionStart: '' });
   const bevents = [];
   const counts = [5, 7, 4, 6, 5, 6];
   counts.forEach((c, i) => {
@@ -157,7 +163,27 @@ export function demoSeed(uids) {
     const day = addDays(t, -8 + i * 3); const at = new Date(day + 'T10:00:00').getTime();
     bevents.push({ id: `e2-${i}`, studentId: 's2', targetId: 'b2', type: 'dur', at, end: at + sec * 1000, intensity: 2, antecedent: '대기', consequence: '교사 관심', note: '', createdBy: uids.a2 || uids.cm, createdAt: at, updatedAt: at, date: day });
   });
-  return { students, goals, targets, bevents };
+  // 순간표집(30초 × 20칸) 4회기, 마지막 회기에는 두 번째 관찰자(일치도) 기록
+  const pattern = [[1,0,1,1,0,0,1,0,1,1,0,1,0,0,1,1,0,1,0,1], [0,0,1,1,1,0,1,0,0,1,1,1,0,0,1,0,0,1,1,0], [1,1,0,1,0,0,1,1,0,1,0,1,1,0,0,1,0,1,0,1], [0,1,1,0,1,0,1,1,0,0,1,1,0,1,0,1,1,0,1,0]];
+  pattern.forEach((r, i) => {
+    const day = addDays(t, -9 + i * 2); const at = new Date(day + 'T11:00:00').getTime();
+    bevents.push({ id: `e3-${i}`, studentId: 's3', targetId: 'b3', type: 'int', at, end: at + 600000, intType: 'momentary', intervalSec: 30, results: r.map(Boolean), intensity: null, antecedent: '', consequence: '', note: '', createdBy: uids.cm, createdAt: at, updatedAt: at, date: day });
+    if (i === 3) { const r2 = r.map((v, k) => (k === 4 || k === 13 ? !v : !!v)); bevents.push({ id: 'e3-ioa', studentId: 's3', targetId: 'b3', type: 'int', ioa: true, at, end: at + 600000, intType: 'momentary', intervalSec: 30, results: r2, intensity: null, antecedent: '', consequence: '', note: '', createdBy: uids.t3 || uids.cm, createdAt: at, updatedAt: at, date: day }); }
+  });
+  // 잠재시간(초) 3회기 × 3번 지시
+  [[42, 35, 50], [38, 30, 33], [25, 40, 28]].forEach((secs, i) => secs.forEach((sec, k) => {
+    const day = addDays(t, -6 + i * 2); const at = new Date(day + 'T09:20:00').getTime() + k * 600000;
+    bevents.push({ id: `e4-${i}-${k}`, studentId: 's2', targetId: 'b4', type: 'lat', at, end: at + sec * 1000, intensity: null, antecedent: '', consequence: '', note: '', createdBy: uids.cm, createdAt: at, updatedAt: at, date: day });
+  }));
+  // 하람 소리 지르기: 두 번째 관찰자(일치도) 기록 한 회기
+  { const day = addDays(t, base + 10); for (let k = 0; k < 5; k++) { const at = new Date(day + 'T09:12:00').getTime() + k * 37 * 60000; bevents.push({ id: `e1-ioa-${k}`, studentId: 's1', targetId: 'b1', type: 'freq', ioa: true, at, intensity: null, antecedent: '', consequence: '', note: '', createdBy: uids.t2 || uids.cm, createdAt: at, updatedAt: at, date: day }); } }
+  // 위기행동 사후 기록 예시(보고·통지 끝, 팀 회고 남음)
+  const iday = addDays(t, -1);
+  const incidents = [{ id: 'ic1', studentId: 's1', date: iday, time: '10:40', place: '통합학급 4-2 교실', antecedent: '받아쓰기 시작 안내 직후', behavior: '책상을 밀고 옆 친구 쪽으로 몸을 던지며 소리 지름', prevent: '1) 언어적 안내와 선택 제시 2) 쉬는 자리 안내 3) 주변 학생 이동', restraint: true, restraintMethod: '양 팔을 잡아 자리로 안내(서서)', rStart: '10:42', rEnd: '10:45', injuryStudent: '없음', injuryStaff: '없음', reportedAt: `${iday}T11:00`, reportedTo: '교장', notifiedAt: `${iday}T13:30`, notifyMethod: '전화', debriefDate: '', debriefAttendees: [], debriefNotes: '', hypothesis: '', bspChange: '', actions: '', closed: false, createdBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }];
+  // 평가조정 한 장 예시
+  const accoms = { s1: [{ id: 'ac1', subject: '국어', presentation: ['문항 읽어 주기', '글자 확대(14pt 이상)'], response: ['구두로 답하기'], timing: ['시간 1.5배'], setting: ['별도 공간'], scheduling: [], other: '', modification: false, modNote: '', sharedWith: [uids.t2].filter(Boolean), confirms: {}, effects: [], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }],
+    s2: [{ id: 'ac2', subject: '수학', presentation: ['한 쪽에 문항 수 줄이기'], response: ['계산기 허용(연산 외 문항)'], timing: ['나눠 보기(2회)'], setting: [], scheduling: ['오전 시행'], other: '', modification: true, modNote: '수학 성취기준을 받아올림 없는 두 자리 덧셈 범위로 낮춤', sharedWith: [uids.t3].filter(Boolean), confirms: uids.t3 ? { [uids.t3]: Date.now() - 86400e3 } : {}, effects: [{ d: addDays(t, -3), by: uids.cm, text: '나눠 보기 후 미응답 문항이 줄어듦' }], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }] };
+  return { students, goals, targets, bevents, incidents, accoms };
 }
 
 function makeDemoStore() {
@@ -165,19 +191,21 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 2) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 4) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 2, school: defaultSchool(), c: {} };
+    const d = { v: 4, school: defaultSchool(), c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));
     Object.entries(sd.goals).forEach(([sid, gs]) => gs.forEach((g) => put(pathOf('goals', { sid }), g)));
     Object.entries(sd.targets).forEach(([sid, ts]) => ts.forEach((x) => put(pathOf('targets', { sid }), x)));
     sd.bevents.forEach((e) => put(pathOf('bevents'), e));
+    sd.incidents.forEach((x) => put(pathOf('incidents'), x));
+    Object.entries(sd.accoms).forEach(([sid, as]) => as.forEach((x) => put(pathOf('accoms', { sid }), x)));
     const now = Date.now();
     put(pathOf('rooms'), { id: 'r-s1', type: 'student', studentId: 's1', name: '하람(가명) IEP팀', memberUids: ['u-admin', 'u-t2'], lastAt: now - 3600e3, lastBy: 'u-t2', lastText: '오늘 국어 시간에 카드 교환이 두 번 있었어요.', readBy: { 'u-admin': now - 7200e3, 'u-t2': now } });
     put(pathOf('messages', { rid: 'r-s1' }), { id: 'm1', by: 'u-admin', at: now - 7300e3, kind: 'text', text: '하람이 소리 지르기 기초선 6회기째입니다. 이번 주 안에 중재 시작을 논의하면 좋겠습니다.' });
@@ -190,6 +218,9 @@ function makeDemoStore() {
     put(pathOf('alerts'), { id: 'al1', type: 'urgent', title: '하람 위기행동 긴급 협의', text: `오늘 15:30 · 특수학급 교실 · 오늘 3교시 사건 공유`, from: 'u-t3', to: ['u-admin', 'u-t2', 'u-t4'], at: now - 600e3, roomId: 'r-all', meetingId: '', ack: {}, hidden: {} });
     put(pathOf('messages', { rid: 'r-all' }), { id: 'm4', by: 'u-t3', at: now - 600e3, kind: 'notice', noticeType: 'urgent', text: `[긴급회의] 하람 위기행동 긴급 협의 · 오늘 15:30 · 특수학급 교실\n오늘 3교시 사건 공유` });
     acadExamples().forEach((x, i) => put(pathOf('acad'), { id: `ac${i}`, ...x, createdBy: 'u-admin' }));
+    // 시연용 개인 시간표·메모·D-Day 별표(김하늘 선생님)
+    const tt = { '1-1': '국어 4-2', '1-2': '수학 특수', '1-3': '사회 특수', '1-5': '창체', '2-1': '수학 특수', '2-2': '국어 3-1', '2-3': '통합 지원 4-2', '2-4': '체육', '3-1': '국어 특수', '3-2': '수학 4-2', '3-3': '음악', '4-1': '사회 특수', '4-2': '국어 특수', '4-3': '과학 4-2', '4-5': '사회성 기술', '5-1': '수학 특수', '5-2': '미술', '5-3': '미술', '5-4': '통합 지원 3-1' };
+    put(pathOf('desks'), { id: 'u-admin', owner: 'u-admin', cells: tt, memo: '하람 보호자 상담 전 행동 그래프 출력\n10/28 협의회 안건: 평가조정 확인율', stars: ['ac4', 'ac5', 'ac7'], updatedAt: Date.now() });
     apptExamples('u-admin', ['u-t2', 'u-t3']).forEach((x, i) => put(pathOf('appts'), { id: `ap${i}`, ...x, createdAt: now }));
     put(pathOf('tasks'), { id: 'tk1', title: '하람 그림카드 세트 교체', assignee: 'u-admin', due: addDays(t, 3), done: false, createdBy: 'u-t2', createdAt: now, studentId: 's1' });
     void u;

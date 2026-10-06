@@ -2,8 +2,8 @@
 import { esc } from './util.js';
 
 export const S = {
-  store: null, me: null, school: {}, members: [], invites: [], students: [], rooms: [], meetings: [], tasks: [], alerts: [], acad: [], appts: [],
-  goalsBy: {}, targetsBy: {}, eventsBy: {}, myEvents: [], memosBy: {}, messagesBy: {},
+  store: null, me: null, school: {}, members: [], invites: [], students: [], rooms: [], meetings: [], tasks: [], alerts: [], acad: [], appts: [], incidents: [], access: [], desk: null,
+  goalsBy: {}, targetsBy: {}, eventsBy: {}, myEvents: [], memosBy: {}, messagesBy: {}, accomsBy: {},
   route: { name: 'today', args: [] }, drafts: {}, running: {}, ui: {}
 };
 
