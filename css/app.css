@@ -657,3 +657,9 @@ button.notice-btn:hover { border-color: var(--danger); }
   .today-layout { grid-template-columns: minmax(0, 1fr) minmax(600px, 36%); }
   .today-side .board { column-count: 2; }
 }
+/* 한눈에 보기 상황판 맨 위 알림(확인할 때까지 깜박임) */
+.alerts-bar.on-board { background: transparent; border: 0; padding: 0; margin: 0 0 1rem; }
+.alerts-bar.on-board ul { max-width: none; gap: .5rem; }
+.alerts-bar.on-board .alert-item { padding: .6rem .9rem; font-size: 1rem; box-shadow: 0 6px 18px -12px rgba(43, 42, 38, .45); }
+.alerts-bar.on-board .alert-item.blink .alert-text b { font-size: 1.05rem; }
+.self-chk { margin-top: .4rem; }
