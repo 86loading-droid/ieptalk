@@ -12,17 +12,19 @@ export const ALERT_TYPES = {
   notice: { label: '공지', cls: 'notice' }
 };
 
-// 받는 사람에게 알림 띠를 만든다(보낸 사람 자신은 제외)
-export async function sendAlert({ type, title, text, to, roomId = '', meetingId = '' }) {
-  const recipients = [...new Set(to)].filter((u) => u && u !== S.me.uid);
+// 받는 사람에게 알림 띠를 만든다. self가 참이면 보낸 사람 자신의 화면에도 띄운다(나에게 보내기)
+export async function sendAlert({ type, title, text, to, roomId = '', meetingId = '', self = false }) {
+  const others = [...new Set(to)].filter((u) => u && u !== S.me.uid);
+  const recipients = self || (to || []).includes(S.me.uid) ? [...others, S.me.uid] : others;
   if (!recipients.length) return null;
   const id = await S.store.create('alerts', {}, { type, title, text, from: S.me.uid, to: recipients, at: Date.now(), roomId, meetingId, ack: {}, hidden: {} });
-  autoRespond({ to: recipients, roomId, meetingId, kind: type });
+  if (others.length) autoRespond({ to: others, roomId, meetingId, kind: type });
   return id;
 }
 
-// 화면 맨 위 알림 띠
-export function alertsBar() {
+// 알림 띠: 한눈에 보기에서는 상황판 맨 위(place='board'), 다른 화면에서는 화면 맨 위에 뜬다.
+// 「확인」을 누를 때까지 깜박이고, 확인한 뒤에도 「삭제」하기 전까지 띠에 남는다.
+export function alertsBar(place = 'top') {
   if (!isTeacher()) return '';
   const me = S.me.uid;
   const list = S.alerts.filter((a) => (a.to || []).includes(me) && !a.hidden?.[me]).sort((a, b) => {
@@ -37,7 +39,7 @@ export function alertsBar() {
     const fresh = !a.ack?.[me];
     return `<li class="alert-item ${t.cls} ${fresh ? 'blink' : 'seen'}">
       <span class="alert-kind">${fresh ? '<span class="alert-new">새 알림</span>' : ''}${t.label}</span>
-      <span class="alert-text"><b>${esc(a.title || t.label)}</b>${a.text ? ` <span>${esc(a.text)}</span>` : ''}<small>${esc(nameOf(a.from))} · ${relTime(a.at)}</small></span>
+      <span class="alert-text"><b>${esc(a.title || t.label)}</b>${a.text ? ` <span>${esc(a.text)}</span>` : ''}<small>${a.from === me ? '내가 나에게' + ((a.to || []).length > 1 ? ` · 함께 받은 ${(a.to || []).filter((u) => u !== me).map(nameOf).join(', ')}` : '') : esc(nameOf(a.from))} · ${relTime(a.at)}</small></span>
       <span class="alert-btns">
         ${a.roomId ? `<button type="button" class="sm ghost" data-act="alert-open" data-id="${a.id}">대화 보기</button>` : ''}
         ${fresh ? `<button type="button" class="sm primary" data-act="alert-ack" data-id="${a.id}">확인</button>` : ''}
@@ -45,7 +47,7 @@ export function alertsBar() {
       </span></li>`;
   }).join('');
   const more = list.length > 3 ? `<button type="button" class="link sm" data-act="alerts-toggle">${open ? '접기' : `알림 ${list.length - 3}건 더 보기`}</button>` : '';
-  return `<section class="alerts-bar" role="region" aria-label="받은 알림 ${list.length}건" aria-live="polite"><ul>${items}</ul>${more}</section>`;
+  return `<section class="alerts-bar ${place === 'board' ? 'on-board' : ''}" role="region" aria-label="받은 알림 ${list.length}건" aria-live="polite"><ul>${items}</ul>${more}</section>`;
 }
 
 on('alert-ack', async (el) => { await S.store.update('alerts', {}, el.dataset.id, { [`ack.${S.me.uid}`]: Date.now() }); });
@@ -84,6 +86,7 @@ export function openNoticeModal(o = {}) {
       <label><input type="radio" name="type" value="notice" ${type === 'notice' ? 'checked' : ''}><span>일반 공지</span></label></fieldset>
     ${room ? `<p class="small">받는 사람: ${esc(room.memberUids.filter((u) => u !== S.me.uid).map(nameOf).join(', '))} (이 대화방)</p>`
       : `<fieldset><legend>받는 사람 <button type="button" class="link sm" data-all>모두 고르기</button></legend><div class="chk-list">${others.map((m) => `<label class="chk"><input type="checkbox" name="u" value="${m.id}" ${pre.has(m.id) ? 'checked' : ''}> ${esc(m.name)} <small class="muted">${esc(m.title || '')}</small></label>`).join('') || '<p class="muted small">초대된 다른 교사가 없습니다.</p>'}</div></fieldset>`}
+    <label class="chk self-chk"><input type="checkbox" name="self" ${o.self || (!room && !others.length) ? 'checked' : ''}> 나에게도 보내기(내 한눈에 보기 맨 위에도 깜박이며 표시)</label>
     <p class="call-note small" hidden>받는 선생님 화면에 「${esc(S.me.name)} 선생님이 전화를 요청했습니다」로 뜹니다. 시간이나 용건이 필요하면 아래 내용에만 적으세요.</p>
     <label data-title>제목<input name="title" required maxlength="40" value="${esc(o.title || '')}" placeholder="예: 하람 위기행동 긴급 협의"></label>
     <div class="when">
@@ -113,10 +116,11 @@ export function openNoticeModal(o = {}) {
     onSubmit: async (fd) => {
       const t = fd.get('type');
       const to = room ? room.memberUids.filter((u) => u !== S.me.uid) : fd.getAll('u');
-      if (!to.length) { toast('받는 사람을 한 명 이상 고르세요'); return false; }
+      const self = fd.get('self') === 'on';
+      if (!to.length && !self) { toast('받는 사람을 고르거나 「나에게도 보내기」를 켜세요'); return false; }
       const text = (fd.get('text') || '').trim();
       const title = t === 'call' ? `${S.me.name} 선생님이 전화를 요청했습니다` : fd.get('title');
-      const roomId = room ? room.id : await roomFor(to);
+      const roomId = room ? room.id : to.length ? await roomFor(to) : '';
       let meetingId = '', when = '';
       if (t === 'urgent') {
         const uids = [S.me.uid, ...to];
@@ -125,10 +129,10 @@ export function openNoticeModal(o = {}) {
         when = `${fmtDate(data.date)} ${data.start}${data.place ? ' · ' + data.place : ''}`;
       }
       const label = { urgent: '긴급회의', call: '전화 예약', notice: '공지' }[t];
-      await postMessage(roomId, { kind: 'notice', noticeType: t, meetingId, text: `[${label}] ${title}${when ? ' · ' + when : ''}${text ? '\n' + text : ''}` });
-      await sendAlert({ type: t, title, text: [when, text].filter(Boolean).join(' · '), to, roomId, meetingId });
-      toast(`${to.length}명에게 ${label}을(를) 보냈습니다`);
-      go('#/chat/' + roomId);
+      if (roomId) await postMessage(roomId, { kind: 'notice', noticeType: t, meetingId, text: `[${label}] ${title}${when ? ' · ' + when : ''}${text ? '\n' + text : ''}` });
+      await sendAlert({ type: t, title, text: [when, text].filter(Boolean).join(' · '), to, roomId, meetingId, self });
+      toast(to.length ? `${to.length}명${self ? '과 나' : ''}에게 ${label}을(를) 보냈습니다` : `나에게 ${label}을(를) 남겼습니다`);
+      go(roomId ? '#/chat/' + roomId : '#/today');
     }
   });
 }

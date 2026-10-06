@@ -9,6 +9,7 @@ import { HOLIDAYS } from '../holidays.js';
 import { crisisPostItems, crisisPostBody } from './incidents.js';
 import { accomsOf, needsMyConfirm } from './accoms.js';
 import { deskWidgets } from './desk.js';
+import { alertsBar } from './alerts.js';
 
 export function deadlines(sc) {
   const list = [];
@@ -126,7 +127,7 @@ export function render() {
     `${toConfirm.length ? `<p class="sub">확인을 부탁받은 평가조정</p><ul class="mini">${toConfirm.map(({ s, a }) => `<li><span class="grow"><a href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><small>${esc(nameOf(a.createdBy))} 선생님이 공유</small></span><button type="button" class="sm primary" data-act="acc-confirm" data-sid="${s.id}" data-id="${a.id}">확인했어요</button></li>`).join('')}</ul>` : ''}
      <p class="sub">내가 공유한 평가조정</p><ul class="mini">${shared.map(({ s, a }) => { const n = (a.sharedWith || []).length, k = (a.sharedWith || []).filter((u) => a.confirms?.[u]).length; return `<li><a class="grow" href="#/student/${s.id}/accom"><b>${esc(s.alias)}</b> ${esc(a.subject)}</a><span class="tag ${k === n ? 'ok' : ''}">확인 ${k}/${n}</span></li>`; }).join('') || '<li class="muted">공유한 평가조정이 없습니다.</li>'}</ul>`);
 
-  return `<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
+  return `${alertsBar('board')}<div class="page-head board-head"><h1>${esc(S.me.name)} 선생님의 한눈에 보기</h1><p class="muted">${esc(fmtDate(t))} · 칸 제목을 누르면 자세한 화면으로 들어갑니다.</p></div>
   <div class="today-layout"><div class="today-main">${deskWidgets(taskBody)}</div>
   <aside class="today-side" aria-label="학생 지원·협업"><h2 class="board-sub">학생 지원·협업</h2>
   <div class="board">${pRec}${pWarn}${pCrisis}${pDeadline}${pCal}${pChat}${pAcc}${pStu}${pMemo}${pAdmin}</div></aside></div>`;
