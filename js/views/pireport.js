@@ -11,6 +11,7 @@ import { esc, todayStr, timeStr, parseDate, openModal, closeModal, toast, newId 
 import { S, on, student, nameOf, member } from '../state.js';
 import { desk, saveDesk } from './desk.js';
 import { logAccess } from '../access.js';
+import { EX } from './pirexamples.js';
 
 // [이름, 보고서 문장]
 const DEF = {
@@ -150,8 +151,8 @@ const TEXTS = ['grade', 'staff', 'staffN', 'peersN', 'handsN', 'bgDetail', 'ante
 // 교사가 고친 버튼 목록(없으면 기본값)
 export function chipsOf(cat) {
   const mine = desk().pirChips?.[cat];
-  if (Array.isArray(mine)) return mine;
-  return (DEF[cat] || []).map(([l, t], i) => ({ id: `${cat}${i}`, l, t }));
+  if (Array.isArray(mine)) return mine.map((c) => ({ ...c, ex: Array.isArray(c.ex) ? c.ex : EX[c.id] || [] }));
+  return (DEF[cat] || []).map(([l, t], i) => ({ id: `${cat}${i}`, l, t, ex: EX[`${cat}${i}`] || [] }));
 }
 
 // ---------- 보고서 문장 만들기 ----------
@@ -161,7 +162,9 @@ const dt = (v) => { if (!v) return ''; const [d, t] = String(v).split('T'); retu
 const end = (s) => { s = String(s || '').trim(); return !s ? '' : /[.!?。)]$/.test(s) ? s : s + '.'; };
 const miss = (label) => `[적지 않음: ${label}]`;
 const labels = (arr) => (arr || []).map((c) => `‘${c.l}’`).join(', ');
-const texts = (arr) => (arr || []).map((c) => end(c.t)).join(' ');
+const ct = (c) => { const d = String(c.d || '').trim(); return d ? `${end(c.t)} (${d.replace(/[.。]$/, '')})` : end(c.t); };
+const texts = (arr) => (arr || []).map(ct).join(' ');
+const part = (c) => String(c.d || '').trim() || c.t; // 부위·자세처럼 낱말 자리에 들어가는 묶음
 const has = (arr) => Array.isArray(arr) && arr.length > 0;
 const num = (v) => (v === '' || v == null ? '' : String(v));
 export function minutesBetween(a, b) {
@@ -191,7 +194,7 @@ export function warningsOf(r) {
   if (has(r.beh) && r.beh.every((c) => /언어|폭언|소란/.test(c.l))) w.push('행동 유형이 말(폭언·소란)뿐입니다. 말로 하는 위협만으로는 물리적 제지의 근거가 약할 수 있으니, 신체 위해가 임박했다고 본 동작을 적어 주세요.');
   const mins = minutesBetween(r.rStart, r.rEnd);
   if (mins != null && mins > 5) w.push(`접촉 시간이 ${mins}분입니다. 5분을 넘긴 이유(놓으려 한 시도, 지원 요청 시각)를 「놓은 근거」 상세에 적어 주세요.`);
-  const free = TEXTS.map((k) => r[k]).concat(Object.keys(GROUPS).flatMap((k) => (r[k] || []).map((c) => c.t))).join(' ');
+  const free = TEXTS.map((k) => r[k]).concat(Object.keys(GROUPS).flatMap((k) => (r[k] || []).map((c) => `${c.t} ${c.d || ''}`))).join(' ');
   const hit = SUBJ.filter((wd) => free.includes(wd));
   if (hit.length) w.push(`해석이 섞인 낱말이 있습니다: ${hit.map((x) => `「${x}」`).join(' ')}. 보고 들은 동작으로 바꿔 주세요(예: 「흥분함」 → 「소리를 지르며 책상을 두 차례 침」).`);
   return w;
@@ -226,7 +229,7 @@ export function buildReport(r, ctx = {}) {
 
   const s3 = [];
   s3.push(r.behDetail ? `관찰한 동작: ${end(r.behDetail)}` : `관찰한 동작: ${miss('관찰한 행동(구체)')}`);
-  if (has(r.beh)) s3.push(`작성자는 이 행동을 ${labels(r.beh)} 유형으로 분류하였습니다(유형 설명: ${r.beh.map((c) => end(c.t)).join(' ')})`);
+  if (has(r.beh)) s3.push(`작성자는 이 행동을 ${labels(r.beh)} 유형으로 분류하였습니다(유형 설명: ${r.beh.map(ct).join(' ')})`);
   if (has(r.risk)) s3.push(`작성자는 당시 위험 수준을 ${labels(r.risk)}(으)로 판단하였습니다. ${texts(r.risk)}`); else s3.push(`위험 수준 판단: ${miss('위험 수준')}`);
   if (r.riskWhy) s3.push(`판단 근거: ${end(r.riskWhy)}`);
   P.push(`3. 학생이 한 행동(보고 들은 그대로)과 위험 판단\n${s3.join(' ')}`);
@@ -234,16 +237,16 @@ export function buildReport(r, ctx = {}) {
   const pre = r.pre || [];
   let s4;
   if (!pre.length) s4 = `신체적 개입 전 조치: ${miss('먼저 해 본 조치')}`;
-  else if (pre.length === 1 && pre[0].l === '시도하지 못함') s4 = `${end(pre[0].t)} 그 이유: ${r.preDetail ? end(r.preDetail) : miss('조치를 못 한 이유')}`;
-  else s4 = `신체적 개입 전에 다음 조치를 순서대로 하였습니다. ${pre.filter((c) => c.l !== '시도하지 못함').map((c, i) => `${i + 1}) ${end(c.t)}`).join(' ')}${r.preDetail ? ` ${end(r.preDetail)}` : ''} 이 조치 뒤에도 위험한 행동이 계속되었습니다.`;
+  else if (pre.length === 1 && pre[0].l === '시도하지 못함') s4 = `${ct(pre[0])} 그 이유: ${r.preDetail ? end(r.preDetail) : miss('조치를 못 한 이유')}`;
+  else s4 = `신체적 개입 전에 다음 조치를 순서대로 하였습니다. ${pre.filter((c) => c.l !== '시도하지 못함').map((c, i) => `${i + 1}) ${ct(c)}`).join(' ')}${r.preDetail ? ` ${end(r.preDetail)}` : ''} 이 조치 뒤에도 위험한 행동이 계속되었습니다.`;
   P.push(`4. 신체적 개입 전에 해 본 조치\n${s4}`);
 
-  P.push(`5. 신체적 개입을 한 이유\n${has(r.reason) ? `신체적 개입은 ${r.reason.map((c) => end(c.t)).join(' 또한 ')}` : `개입한 이유: ${miss('개입한 이유')}`} 작성자는 이 상황을 「초·중등교육법」과 「교원의 학생생활지도에 관한 고시」에서 정한 긴급한 경우의 물리적 제지가 필요한 상황으로 판단하였습니다.`);
+  P.push(`5. 신체적 개입을 한 이유\n${has(r.reason) ? `신체적 개입은 ${r.reason.map(ct).join(' 또한 ')}` : `개입한 이유: ${miss('개입한 이유')}`} 작성자는 이 상황을 「초·중등교육법」과 「교원의 학생생활지도에 관한 고시」에서 정한 긴급한 경우의 물리적 제지가 필요한 상황으로 판단하였습니다.`);
 
   const s6 = [];
   s6.push(has(r.tech) ? `개입 방법은 ${labels(r.tech)}입니다. ${texts(r.tech)}` : `개입 방법: ${miss('개입 방법')}`);
-  s6.push(has(r.body) ? `접촉 부위는 ${r.body.map((c) => c.t).join(', ')}입니다.` : `접촉 부위: ${miss('접촉 부위')}`);
-  if (has(r.pose)) s6.push(`학생은 ${r.pose[0].t}였습니다.`);
+  s6.push(has(r.body) ? `접촉 부위는 ${r.body.map(part).join(', ')}입니다.` : `접촉 부위: ${miss('접촉 부위')}`);
+  if (has(r.pose)) s6.push(`학생은 ${part(r.pose[0])}였습니다.`);
   if (num(r.handsN)) s6.push(`개입에는 교직원 ${r.handsN}명이 참여하였습니다.`);
   if (r.techDetail) s6.push(end(r.techDetail));
   const safe = r.safe || {};
@@ -255,7 +258,7 @@ export function buildReport(r, ctx = {}) {
   const s7 = [];
   const mins = minutesBetween(r.rStart, r.rEnd);
   if (mins != null) s7.push(`신체적 개입은 ${r.rStart}에 시작하여 ${r.rEnd}에 끝났습니다(접촉 시간 ${mins === 0 ? '1분 미만' : `약 ${mins}분`}).`);
-  else if (has(r.dur)) s7.push(`시작·끝 시각은 기록하지 못하였고, 지속 시간은 ${end(r.dur[0].t)}`);
+  else if (has(r.dur)) s7.push(`시작·끝 시각은 기록하지 못하였고, 지속 시간은 ${ct(r.dur[0])}`);
   else s7.push(`시작·끝 시각: ${miss('시작·끝 시각')}`);
   s7.push(has(r.endWhy) ? `개입을 끝낸 근거: ${texts(r.endWhy)}` : `개입을 끝낸 근거: ${miss('놓은 근거')}`);
   if (r.endDetail) s7.push(end(r.endDetail));
@@ -312,10 +315,24 @@ function groupHtml(cat, st, editing) {
   const g = GROUPS[cat], list = chipsOf(cat), sel = st[cat] || [];
   const head = `<div class="pr-head"><span class="pr-gt">${esc(g.t)}</span><small class="muted">${g.multi ? '여러 개' : '하나'}</small><span class="grow"></span><button type="button" class="ghost chip-btn" data-pr="edit" data-cat="${cat}" aria-expanded="${editing ? 'true' : 'false'}">${editing ? '고치기 끝' : '버튼 고치기'}</button></div>`;
   if (editing) {
-    return `<div class="pr-group editing" data-cat="${cat}">${head}<ul class="pr-edit">${list.map((c, i) => `<li data-id="${esc(c.id)}"><input data-pe="l" value="${esc(c.l)}" aria-label="버튼 이름"><textarea data-pe="t" rows="2" aria-label="보고서 문장">${esc(c.t)}</textarea><span class="pr-ebtn"><button type="button" class="ghost chip-btn" data-pr="up" ${i ? '' : 'disabled'} aria-label="위로">↑</button><button type="button" class="ghost chip-btn danger" data-pr="del" aria-label="${esc(c.l)} 지우기">지우기</button></span></li>`).join('')}</ul>
-      <div class="bar"><button type="button" class="chip-btn" data-pr="add">＋ 새 버튼</button><button type="button" class="ghost chip-btn" data-pr="reset">기본 버튼으로</button><span class="muted tiny">이름은 버튼에, 문장은 보고서에 들어갑니다. 내 계정에만 저장됩니다.</span></div></div>`;
+    return `<div class="pr-group editing" data-cat="${cat}">${head}<ul class="pr-edit">${list.map((c, i) => `<li data-id="${esc(c.id)}"><input data-pe="l" value="${esc(c.l)}" aria-label="버튼 이름"><textarea data-pe="t" rows="2" aria-label="보고서 문장">${esc(c.t)}</textarea><textarea data-pe="x" rows="3" class="pr-ex-edit" aria-label="상세 예시(줄마다 하나)" placeholder="상세 예시(줄마다 하나)">${esc((c.ex || []).join('\n'))}</textarea><span class="pr-ebtn"><button type="button" class="ghost chip-btn" data-pr="up" ${i ? '' : 'disabled'} aria-label="위로">↑</button><button type="button" class="ghost chip-btn danger" data-pr="del" aria-label="${esc(c.l)} 지우기">지우기</button></span></li>`).join('')}</ul>
+      <div class="bar"><button type="button" class="chip-btn" data-pr="add">＋ 새 버튼</button><button type="button" class="ghost chip-btn" data-pr="reset">기본 버튼으로</button><span class="muted tiny">이름은 버튼에, 문장은 보고서에 들어갑니다. 상세 예시는 줄마다 하나씩 적으면 드롭다운에 나옵니다. 내 계정에만 저장됩니다.</span></div></div>`;
   }
-  return `<div class="pr-group" data-cat="${cat}">${head}<div class="pr-chips">${list.map((c) => { const k = sel.findIndex((x) => x.id === c.id); return `<button type="button" class="pr-chip ${k >= 0 ? 'on' : ''}" aria-pressed="${k >= 0}" data-pr="tog" data-id="${esc(c.id)}" title="${esc(c.t)}">${g.order && k >= 0 ? `<b class="pr-n">${k + 1}</b>` : ''}${esc(c.l)}</button>`; }).join('')}</div></div>`;
+  return `<div class="pr-group" data-cat="${cat}">${head}<div class="pr-chips">${list.map((c) => { const k = sel.findIndex((x) => x.id === c.id); return `<button type="button" class="pr-chip ${k >= 0 ? 'on' : ''}" aria-pressed="${k >= 0}" data-pr="tog" data-id="${esc(c.id)}" title="${esc(c.t)}">${g.order && k >= 0 ? `<b class="pr-n">${k + 1}</b>` : ''}${esc(c.l)}</button>`; }).join('')}</div>${detsHtml(cat, list, sel)}</div>`;
+}
+
+// 고른 버튼마다 상세 예시 드롭다운과 상세 칸
+function detsHtml(cat, list, sel) {
+  if (!sel.length) return '';
+  return `<div class="pr-dets">${sel.map((x) => {
+    const c = list.find((y) => y.id === x.id) || x;
+    const ex = c.ex || [];
+    const d = x.d || '';
+    const inList = ex.includes(d);
+    return `<div class="pr-det" data-id="${esc(x.id)}"><span class="pr-det-l">${esc(x.l)}</span>
+      <select data-pd="sel" aria-label="${esc(x.l)} 상세 예시 고르기"><option value="">${ex.length ? `상세 예시 ${ex.length}개에서 고르기` : '상세 예시 없음'}</option>${ex.map((e) => `<option ${e === d ? 'selected' : ''}>${esc(e)}</option>`).join('')}${d && !inList ? '<option value="__own" selected>직접 쓴 상세</option>' : ''}</select>
+      <input data-pd="d" value="${esc(d)}" placeholder="상세(고른 뒤 사실대로 고치세요)" aria-label="${esc(x.l)} 상세"></div>`;
+  }).join('')}</div>`;
 }
 
 const inp = (st, name, label, type = 'text', ph = '', cls = '') => `<label class="${cls}">${label}<input type="${type}" name="${name}" value="${esc(st[name] || '')}" placeholder="${esc(ph)}"></label>`;
@@ -434,24 +451,32 @@ export function openPir(id, sid, eventId = '') {
         if (old) old.outerHTML = groupHtml(cat, st, editing.has(cat));
       };
 
+      const detOf = (t) => { const row = t.closest('.pr-det'); const cat = t.closest('.pr-group')?.dataset.cat; const x = (st[cat] || []).find((y) => y.id === row?.dataset.id); return { row, x }; };
       main.addEventListener('input', (e) => {
         const t = e.target;
+        if (t.dataset.pd === 'd') { const { x } = detOf(t); if (x) { x.d = t.value; dirty = true; refresh(); } return; }
         if (t.name && (TEXTS.includes(t.name) || SHARED.includes(t.name))) { st[t.name] = t.value; dirty = true; refresh(); }
       });
       main.addEventListener('change', (e) => {
         const t = e.target;
+        if (t.dataset.pd === 'sel') {
+          const { row, x } = detOf(t);
+          if (x && t.value !== '__own') { x.d = t.value; const box = row.querySelector('[data-pd=d]'); box.value = t.value; dirty = true; refresh(); if (t.value) box.focus(); }
+          return;
+        }
+        if (t.dataset.pd) return;
         if (t.dataset.safe) { st.safe = { ...(st.safe || {}), [t.dataset.safe]: t.checked }; dirty = true; refresh(); }
         else if (t.name) { st[t.name] = t.value; dirty = true; refresh(); }
       });
 
       const readEdits = (cat) => {
         const box = main.querySelector(`.pr-group[data-cat="${cat}"]`);
-        return [...box.querySelectorAll('.pr-edit li')].map((li) => ({ id: li.dataset.id, l: li.querySelector('[data-pe=l]').value.trim(), t: li.querySelector('[data-pe=t]').value.trim() })).filter((c) => c.l);
+        return [...box.querySelectorAll('.pr-edit li')].map((li) => ({ id: li.dataset.id, l: li.querySelector('[data-pe=l]').value.trim(), t: li.querySelector('[data-pe=t]').value.trim(), ex: (li.querySelector('[data-pe=x]')?.value || '').split('\n').map((x) => x.trim()).filter(Boolean) })).filter((c) => c.l);
       };
       const saveChips = (cat, list) => {
         saveDesk({ pirChips: { ...(desk().pirChips || {}), [cat]: list } });
         // 지금 고른 버튼의 문장도 고친 대로 바꾼다(지운 버튼은 고른 목록에서도 뺀다)
-        if (st[cat]) st[cat] = st[cat].map((x) => list.find((c) => c.id === x.id) || null).filter(Boolean).map(({ id, l, t }) => ({ id, l, t }));
+        if (st[cat]) st[cat] = st[cat].map((x) => { const c = list.find((y) => y.id === x.id); return c ? { id: c.id, l: c.l, t: c.t, d: x.d || '' } : null; }).filter(Boolean);
       };
 
       m.addEventListener('click', async (e) => {
@@ -465,15 +490,15 @@ export function openPir(id, sid, eventId = '') {
           const c = chipsOf(cat).find((x) => x.id === b.dataset.id); if (!c) return;
           const cur = st[cat] || [];
           const k = cur.findIndex((x) => x.id === c.id);
-          if (GROUPS[cat].multi) st[cat] = k >= 0 ? cur.filter((x) => x.id !== c.id) : [...cur, { id: c.id, l: c.l, t: c.t }];
-          else st[cat] = k >= 0 ? [] : [{ id: c.id, l: c.l, t: c.t }];
+          if (GROUPS[cat].multi) st[cat] = k >= 0 ? cur.filter((x) => x.id !== c.id) : [...cur, { id: c.id, l: c.l, t: c.t, d: '' }];
+          else st[cat] = k >= 0 ? [] : [{ id: c.id, l: c.l, t: c.t, d: cur[0]?.d && cur[0].id === c.id ? cur[0].d : '' }];
           dirty = true; repaintGroup(cat); main.querySelector(`.pr-group[data-cat="${cat}"] [data-id="${CSS.escape(c.id)}"]`)?.focus(); refresh();
         } else if (act === 'edit') {
           if (editing.has(cat)) { saveChips(cat, readEdits(cat)); editing.delete(cat); toast('버튼을 저장했습니다'); }
           else editing.add(cat);
           repaintGroup(cat); main.querySelector(`.pr-group[data-cat="${cat}"] [data-pr="edit"]`)?.focus(); refresh();
         } else if (act === 'add') {
-          const list = readEdits(cat); list.push({ id: `${cat}-${newId()}`, l: '새 버튼', t: '' });
+          const list = readEdits(cat); list.push({ id: `${cat}-${newId()}`, l: '새 버튼', t: '', ex: [] });
           saveChips(cat, list); repaintGroup(cat);
           const last = [...main.querySelectorAll(`.pr-group[data-cat="${cat}"] .pr-edit li`)].pop();
           last?.querySelector('[data-pe=l]')?.select();
