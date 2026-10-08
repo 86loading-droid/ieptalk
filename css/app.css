@@ -720,3 +720,32 @@ button.notice-btn:hover { border-color: var(--danger); }
 @media (max-width: 760px) { .pr-det { grid-template-columns: 1fr; } }
 .pr-ex-edit { grid-column: 1 / -2; font-size: .85rem; }
 @media (max-width: 640px) { .pr-ex-edit { grid-column: auto; } }
+/* v19: 학생 관찰 메모 */
+.pr-chip.sm { min-height: 34px; padding: .2rem .65rem; font-size: .86rem; }
+.nt-when { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin-bottom: .4rem; }
+.nt-when label { width: auto; flex: 0 0 auto; }
+.nt-when input { width: auto; }
+.nt-period { font-size: .86rem; color: var(--primary); font-weight: 600; padding-bottom: .7rem; }
+.nt-row { display: grid; grid-template-columns: 3rem 1fr; gap: .4rem; align-items: start; margin: .3rem 0; }
+.nt-k { font-size: .84rem; font-weight: 600; color: var(--muted); padding-top: .45rem; }
+.nt-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.nt-input { margin-top: .4rem; }
+.nt-filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; margin-bottom: .5rem; }
+.nt-f { width: auto; flex: 0 1 auto; font-size: .84rem; }
+.nt-f select, .nt-f input[type=search] { width: auto; min-width: 7rem; min-height: 38px; padding: .3rem .5rem; }
+.seg-btns { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg-btns button { border: 0; border-radius: 0; min-height: 38px; padding: .3rem .8rem; }
+.seg-btns button + button { border-left: 1px solid var(--line); }
+.seg-btns button.on { background: var(--primary); color: var(--primary-ink); font-weight: 600; }
+.nt-group { margin-top: .8rem; }
+.nt-gh { font-size: .95rem; margin: 0 0 .35rem; padding-bottom: .25rem; border-bottom: 1px solid var(--line); }
+.nt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; }
+.nt-item { border: 1px solid var(--line); border-radius: 10px; padding: .55rem .7rem; background: var(--surface); }
+.nt-item.nt-imp { border-left: 4px solid var(--focus); }
+.nt-meta { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; font-size: .86rem; }
+.nt-meta .tag.subj { background: var(--primary-soft); color: var(--primary); }
+.nt-meta .tag.sit { background: var(--sky-soft); color: var(--sky); }
+.nt-star { color: var(--focus); }
+.nt-text { margin: .3rem 0; white-space: pre-wrap; line-height: 1.6; }
+.nt-foot { display: flex; align-items: center; gap: .3rem; }
+@media (max-width: 640px) { .nt-row { grid-template-columns: 1fr; } .nt-k { padding-top: 0; } }
