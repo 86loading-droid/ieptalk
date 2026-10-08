@@ -179,7 +179,22 @@ export function demoSeed(uids) {
   { const day = addDays(t, base + 10); for (let k = 0; k < 5; k++) { const at = new Date(day + 'T09:12:00').getTime() + k * 37 * 60000; bevents.push({ id: `e1-ioa-${k}`, studentId: 's1', targetId: 'b1', type: 'freq', ioa: true, at, intensity: null, antecedent: '', consequence: '', note: '', createdBy: uids.t2 || uids.cm, createdAt: at, updatedAt: at, date: day }); } }
   // 위기행동 사후 기록 예시(보고·통지 끝, 팀 회고 남음)
   const iday = addDays(t, -1);
-  const incidents = [{ id: 'ic1', studentId: 's1', date: iday, time: '10:40', place: '통합학급 4-2 교실', antecedent: '받아쓰기 시작 안내 직후', behavior: '책상을 밀고 옆 친구 쪽으로 몸을 던지며 소리 지름', prevent: '1) 언어적 안내와 선택 제시 2) 쉬는 자리 안내 3) 주변 학생 이동', restraint: true, restraintMethod: '양 팔을 잡아 자리로 안내(서서)', rStart: '10:42', rEnd: '10:45', injuryStudent: '없음', injuryStaff: '없음', reportedAt: `${iday}T11:00`, reportedTo: '교장', notifiedAt: `${iday}T13:30`, notifyMethod: '전화', debriefDate: '', debriefAttendees: [], debriefNotes: '', hypothesis: '', bspChange: '', actions: '', closed: false, createdBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }];
+  const incidents = [{ id: 'ic1', studentId: 's1', date: iday, time: '10:40', place: '통합학급 4-2 교실', antecedent: '받아쓰기 시작 안내 직후', behavior: '책상을 밀고 옆 친구 쪽으로 몸을 던지며 소리 지름', prevent: '1) 언어적 안내와 선택 제시 2) 쉬는 자리 안내 3) 주변 학생 이동', restraint: true, restraintMethod: '양 팔을 잡아 자리로 안내(서서)', rStart: '10:42', rEnd: '10:45', injuryStudent: '없음', injuryStaff: '없음', reportedAt: `${iday}T11:00`, reportedTo: '교장', notifiedAt: `${iday}T13:30`, notifyMethod: '전화', debriefDate: '', debriefAttendees: [], debriefNotes: '', hypothesis: '', bspChange: '', actions: '', closed: false, createdBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true,
+    pir: { grade: '초 4-2', staff: '통합학급 담임, 특수교사', staffN: '2', peersN: '22', handsN: '1',
+      src: [{ id: 'src2', l: '보호자 전달', t: '보호자에게서 전해 들었습니다.' }],
+      bg: [{ id: 'bg0', l: '수면 부족/피로', t: '전날 수면이 부족하였다는 정보가 있었습니다.' }], bgDetail: '보호자가 아침 알림장에 「어젯밤 늦게 잠듦」이라고 적음',
+      ante: [{ id: 'ante0', l: '과제/지시 제시', t: '교사가 과제를 제시하거나 지시를 하였습니다.' }], anteDetail: '10:38 받아쓰기 공책을 펴도록 안내',
+      beh: [{ id: 'beh0', l: '신체적 공격행동', t: '다른 사람을 주먹으로 치거나, 발로 차거나, 밀거나, 옷깃(멱살)을 잡는 행동을 하였습니다.' }], behDetail: '10:40 책상을 앞으로 두 차례 밀고, 오른쪽 짝 쪽으로 몸을 던지며 소리를 지름',
+      risk: [{ id: 'risk1', l: '고위험(자·타해 임박)', t: '자신이나 다른 사람의 신체에 위해가 곧 일어날 상황이었습니다.' }], riskWhy: '짝과의 거리가 50cm 이내였고, 오른팔을 짝 얼굴 쪽으로 휘두름',
+      reason: [{ id: 'reason1', l: '다른 학생 신체 보호', t: '다른 학생의 신체에 대한 위해를 막기 위해서였습니다.' }],
+      pre: [{ id: 'pre0', l: '언어적 안내', t: '차분하고 짧은 말로 멈추도록 안내하였습니다.' }, { id: 'pre2', l: '선택 제시', t: '할 수 있는 선택지 두 가지를 제시하였습니다.' }, { id: 'pre4', l: '주변 학생 대피', t: '주변 학생들을 안전한 곳으로 이동시켰습니다.' }], preDetail: '',
+      tech: [{ id: 'tech1', l: '팔 안내(에스코트)', t: '학생의 아래팔을 가볍게 잡아 안전한 곳으로 함께 이동하였습니다.' }], body: [{ id: 'body1', l: '아래팔', t: '아래팔' }], pose: [{ id: 'pose0', l: '선 자세', t: '선 자세' }], techDetail: '',
+      safe: { neck: true, chest: true, prone: true, floor: true, joint: true, pain: true, mouth: true, tool: true },
+      dur: [], endWhy: [{ id: 'endWhy0', l: '공격·자해 멈춤', t: '공격·자해 행동이 멈추었습니다.' }, { id: 'endWhy1', l: '호흡이 고르게 돌아옴', t: '학생의 호흡이 고르게 돌아왔습니다.' }], endDetail: '',
+      after: [{ id: 'after1', l: '안정 공간으로 이동', t: '학생이 완충 매트 등 안정 공간으로 이동하였습니다.' }],
+      stu: [{ id: 'stu0', l: '이상 없음', t: '학생에게 눈에 보이는 상처나 신체 이상이 없음을 확인하였습니다.' }], staffSt: [{ id: 'staffSt0', l: '이상 없음', t: '교직원에게 부상이 없음을 확인하였습니다.' }], injDetail: '',
+      rep: [{ id: 'rep1', l: '구두 보고', t: '학교장(관리자)에게 구두로 보고하였습니다.' }], par: [{ id: 'par1', l: '유선 고지', t: '보호자에게 전화로 알렸습니다.' }], parBy: '',
+      deb: [{ id: 'deb1', l: '진행 예정', t: '학생의 정서가 회복된 뒤 회복 대화를 할 예정입니다.' }], video: 'no', videoWhere: '', confirmer: '', extra: '' } }];
   // 평가조정 한 장 예시
   const accoms = { s1: [{ id: 'ac1', subject: '국어', presentation: ['문항 읽어 주기', '글자 확대(14pt 이상)'], response: ['구두로 답하기'], timing: ['시간 1.5배'], setting: ['별도 공간'], scheduling: [], other: '', modification: false, modNote: '', sharedWith: [uids.t2].filter(Boolean), confirms: {}, effects: [], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }],
     s2: [{ id: 'ac2', subject: '수학', presentation: ['한 쪽에 문항 수 줄이기'], response: ['계산기 허용(연산 외 문항)'], timing: ['나눠 보기(2회)'], setting: [], scheduling: ['오전 시행'], other: '', modification: true, modNote: '수학 성취기준을 받아올림 없는 두 자리 덧셈 범위로 낮춤', sharedWith: [uids.t3].filter(Boolean), confirms: uids.t3 ? { [uids.t3]: Date.now() - 86400e3 } : {}, effects: [{ d: addDays(t, -3), by: uids.cm, text: '나눠 보기 후 미응답 문항이 줄어듦' }], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }] };
@@ -191,13 +206,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 4) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 5) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 4, school: defaultSchool(), c: {} };
+    const d = { v: 5, school: defaultSchool(), c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));
