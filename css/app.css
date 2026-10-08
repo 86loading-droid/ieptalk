@@ -679,3 +679,36 @@ button.notice-btn:hover { border-color: var(--danger); }
 .widget[data-h="high"] .w-body, .post[data-h="high"] .post-body { min-height: 420px; }
 .w-now .lay-btn, .w-now .lay-sel { color: var(--text); }
 .lay-bar .lay-sel { width: auto; flex: none; display: inline-block; margin: 0; }
+
+/* v17: 신체적 개입 사후 보고서 */
+@media (min-width: 700px) { .modal.wide.xwide { width: min(1180px, 96vw); } }
+.pr-top { display: flex; align-items: center; gap: .5rem; }
+.pr-top h2 { margin: 0; }
+.pr-cols { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+@media (min-width: 1000px) { .pr-cols { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); } .pr-side-in { position: sticky; top: 0; max-height: 84dvh; display: flex; flex-direction: column; } .pr-doc { flex: 1; min-height: 0; } }
+.pr-group { margin: .5rem 0 .7rem; }
+.pr-head { display: flex; align-items: center; gap: .4rem; margin-bottom: .3rem; }
+.pr-gt { font-weight: 600; font-size: .92rem; }
+.pr-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+.pr-chip { min-height: 40px; padding: .3rem .8rem; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); font-size: .9rem; display: inline-flex; align-items: center; gap: .3rem; }
+.pr-chip.on { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); font-weight: 600; }
+.pr-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.pr-n { display: inline-grid; place-items: center; width: 1.3rem; height: 1.3rem; border-radius: 50%; background: var(--surface); color: var(--primary); font-size: .75rem; }
+.pr-edit { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.pr-edit li { display: grid; grid-template-columns: minmax(8rem, 1fr) 2fr auto; gap: .4rem; align-items: start; padding: .4rem; border: 1px dashed var(--line); border-radius: 10px; }
+@media (max-width: 640px) { .pr-edit li { grid-template-columns: 1fr; } }
+.pr-edit textarea, .pr-edit input { min-height: 38px; }
+.pr-ebtn { display: flex; gap: .3rem; }
+.pr-safe { border-top: 1px dashed var(--line); margin-top: .5rem; padding-top: .4rem; }
+.pr-tools { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .4rem; }
+.pr-status { margin: .2rem 0 .4rem; }
+.pr-status code, .pr-hist code { font-size: .8rem; }
+.pr-warn p { margin: .25rem 0; padding: .4rem .6rem; border-radius: 8px; font-size: .86rem; }
+.pr-warn .pr-miss { background: var(--surface-2); }
+.pr-warn .pr-miss .tag { margin: .1rem 0; }
+.pr-warn .pr-w { background: var(--warn-soft); color: var(--warn); }
+.pr-warn .pr-ok { background: var(--ok-soft); color: var(--ok); }
+.pr-doc { white-space: pre-wrap; word-break: keep-all; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; border: 1px solid var(--line); border-radius: 10px; padding: .9rem 1rem; background: var(--surface); line-height: 1.75; font-size: .93rem; overflow: auto; max-height: 70dvh; }
+.pr-hist { margin-top: .5rem; }
+#print-root .pr-print { white-space: pre-wrap; word-break: keep-all; font-family: var(--font); font-size: 11pt; line-height: 1.7; margin: 0; }
+@media (min-width: 1000px) { .pr-jump { display: none; } }
