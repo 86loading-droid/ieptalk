@@ -7,6 +7,7 @@ import { HOLIDAYS } from '../holidays.js';
 import { confirmInline, INTENSITY } from './record.js';
 import { openMeetingModal } from './calendar.js';
 import { sendAlert } from './alerts.js';
+import { pirStatus } from './pireport.js';
 
 const isSchoolDay = (d) => { const w = parseDate(d).getDay(); return w !== 0 && w !== 6 && !HOLIDAYS[d]; };
 export function schoolDaysAfter(d, n) { let x = d, k = 0; while (k < n) { x = addDays(x, 1); if (isSchoolDay(x)) k++; } return x; }
@@ -63,18 +64,18 @@ export function crisisTab(s, args = []) {
     const nx = nextStep(ic);
     return `<section class="card incident">
       <div class="goal-head"><h2 class="h3">${esc(fmtDate(ic.date))} ${esc(ic.time || '')} <small class="muted">${esc(ic.place || '')}</small></h2><span class="grow"></span>
-        ${ic.restraint ? '<span class="tag warn">물리적 제지</span>' : ''}<button type="button" class="ghost sm" data-act="ic-open" data-id="${ic.id}">열기</button></div>
+        ${ic.restraint ? `<span class="tag warn">물리적 제지</span><span class="tag ${pirStatus(ic).cls}">${pirStatus(ic).label}</span><button type="button" class="ghost sm" data-act="pir-open" data-id="${ic.id}">보고서</button>` : ''}<button type="button" class="ghost sm" data-act="ic-open" data-id="${ic.id}">열기</button></div>
       ${stepper(ic)}
       <p class="small">${esc(ic.behavior || '')}</p>
       <p class="small">다음 단계: <b>${esc(nx.label)}</b> ${dday(nx.due)}</p>
     </section>`;
   }).join('');
-  return `<div class="bar"><button type="button" class="primary" data-act="ic-new" data-sid="${s.id}">사후 기록 시작</button>
+  return `<div class="bar"><button type="button" class="primary" data-act="ic-new" data-sid="${s.id}">사후 기록 시작</button><button type="button" class="ghost" data-act="pir-new" data-sid="${s.id}">신체적 개입 보고서 쓰기</button>
     <span class="muted small">물리적 제지가 있었거나 팀이 함께 돌아봐야 할 위기행동 뒤에 씁니다. 처벌이 아니라 재발 방지와 지원 계획을 위한 기록입니다.</span></div>
     ${rw ? `<div class="alert warn" role="alert"><span>최근 ${rw.days}일 동안 사후 기록이 ${rw.cnt}건입니다(기준 ${rw.n}건). 행동지원계획 재검토를 권합니다.</span><button type="button" class="sm" data-act="ic-review-meet" data-sid="${s.id}">재검토 회의 예약</button></div>` : ''}
-    ${flagged.length ? `<section class="card"><h2 class="h3">사후 기록이 필요한 기록 ${flagged.length}</h2><ul class="rows">${flagged.map((e) => `<li><span class="grow">${esc(fmtDate(e.date))} ${timeStr(new Date(e.at))} · 물리적 제지${e.intensity ? ` · 강도 ${INTENSITY[e.intensity]}` : ''}<small class="muted"> · 기록 ${esc(nameOf(e.createdBy))}</small></span><button type="button" class="sm primary" data-act="ic-from-ev" data-sid="${s.id}" data-eid="${e.id}">사후 기록 시작</button></li>`).join('')}</ul></section>` : ''}
+    ${flagged.length ? `<section class="card"><h2 class="h3">사후 기록이 필요한 기록 ${flagged.length}</h2><ul class="rows">${flagged.map((e) => `<li><span class="grow">${esc(fmtDate(e.date))} ${timeStr(new Date(e.at))} · 물리적 제지${e.intensity ? ` · 강도 ${INTENSITY[e.intensity]}` : ''}<small class="muted"> · 기록 ${esc(nameOf(e.createdBy))}</small></span><button type="button" class="sm primary" data-act="ic-from-ev" data-sid="${s.id}" data-eid="${e.id}">사후 기록 시작</button><button type="button" class="sm ghost" data-act="pir-new" data-sid="${s.id}" data-eid="${e.id}">보고서로 시작</button></li>`).join('')}</ul></section>` : ''}
     ${cards || '<section class="card"><p class="muted">아직 사후 기록이 없습니다.</p></section>'}
-    <p class="small muted">근거: 「교원의 학생생활지도에 관한 고시」(교육부고시 제2023-28호)는 긴급한 경우의 물리적 제지와 학교장 보고·보호자 통지를 정합니다(조항은 원문으로 확인). 팀 회고 기한은 법정 수치가 없어 학교 설정값(현재 ${debriefDays() > 0 ? `${debriefDays()} 수업일` : '사용 안 함'})으로만 안내합니다.</p>`;
+    <p class="small muted">근거: 「초·중등교육법」 제20조의2(2026. 3. 1. 시행, 조문은 국가법령정보센터 원문으로 확인)와 「교원의 학생생활지도에 관한 고시」(교육부고시 제2023-28호)는 긴급한 경우의 물리적 제지와 학교장 보고·보호자 통지를 정합니다. 물리적 제지가 있었으면 「보고서」에서 문단 보고서를 만들어 복사할 수 있습니다. 팀 회고 기한은 법정 수치가 없어 학교 설정값(현재 ${debriefDays() > 0 ? `${debriefDays()} 수업일` : '사용 안 함'})으로만 안내합니다.</p>`;
 }
 
 function form(ic, sid) {
@@ -109,7 +110,7 @@ function form(ic, sid) {
     </fieldset>
     <fieldset><legend>4. 마무리</legend><label class="chk"><input type="checkbox" name="closed" ${ic.closed ? 'checked' : ''}> 보고·통지·회고와 조치를 확인하고 마무리함</label></fieldset>
     <p class="small muted">이 기록은 교사만 볼 수 있습니다. 학생 실명과 다른 학생의 개인정보는 적지 마세요.</p>
-    <div class="actions">${ic.id && (ic.createdBy === S.me.uid || isAdmin()) ? '<button type="button" class="danger ghost" data-del>삭제</button>' : ''}${ic.id ? '<button type="button" class="ghost" data-notify>팀에 알리기</button><button type="button" class="ghost" data-meet>회고 회의 예약</button>' : ''}<span class="grow"></span><button type="button" class="ghost" data-close>닫기</button><button type="submit" class="primary">저장</button></div></form>`;
+    <div class="actions">${ic.id && (ic.createdBy === S.me.uid || isAdmin()) ? '<button type="button" class="danger ghost" data-del>삭제</button>' : ''}${ic.id && ic.restraint ? `<button type="button" class="ghost" data-act="pir-open" data-id="${ic.id}">신체적 개입 보고서</button>` : ''}${ic.id ? '<button type="button" class="ghost" data-notify>팀에 알리기</button><button type="button" class="ghost" data-meet>회고 회의 예약</button>' : ''}<span class="grow"></span><button type="button" class="ghost" data-close>닫기</button><button type="submit" class="primary">저장</button></div></form>`;
 }
 
 const fdData = (fd) => ({

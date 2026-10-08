@@ -43,7 +43,7 @@ export function weatherBody() {
     <p class="wx-sub">체감 ${Math.round(cur.apparent_temperature)}° · 습도 ${cur.relative_humidity_2m}% · 바람 ${cur.wind_speed_10m}m/s</p>
     ${g10 || g25 ? `<p class="wx-air">${g10 ? `<span class="air ${g10[1]}">미세먼지 ${g10[0]}</span>` : ''}${g25 ? `<span class="air ${g25[1]}">초미세먼지 ${g25[0]}</span>` : ''}</p>` : ''}
     ${tmr ? `<p class="wx-sub">${esc(tmr)}</p>` : ''}
-    <p class="tiny muted">Open-Meteo 예보 · 미세먼지는 모델 추정값(에어코리아 실측과 다를 수 있음)</p>`;
+    <p class="tiny muted">날씨 자료: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>(<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>) · 미세먼지는 모델 추정값(에어코리아 실측과 다를 수 있음)</p>`;
 }
 
 /* ---------- 급식 ---------- */
