@@ -712,3 +712,11 @@ button.notice-btn:hover { border-color: var(--danger); }
 .pr-hist { margin-top: .5rem; }
 #print-root .pr-print { white-space: pre-wrap; word-break: keep-all; font-family: var(--font); font-size: 11pt; line-height: 1.7; margin: 0; }
 @media (min-width: 1000px) { .pr-jump { display: none; } }
+/* v18: 버튼별 상세 예시 드롭다운 */
+.pr-dets { display: grid; gap: .35rem; margin-top: .45rem; padding: .45rem .55rem; border-left: 3px solid var(--primary); background: var(--surface-2); border-radius: 0 10px 10px 0; }
+.pr-det { display: grid; grid-template-columns: minmax(6.5rem, auto) minmax(0, 1fr) minmax(0, 1.2fr); gap: .35rem; align-items: center; }
+.pr-det-l { font-size: .84rem; font-weight: 600; color: var(--primary); }
+.pr-det select, .pr-det input { min-height: 38px; font-size: .88rem; padding: .3rem .5rem; }
+@media (max-width: 760px) { .pr-det { grid-template-columns: 1fr; } }
+.pr-ex-edit { grid-column: 1 / -2; font-size: .85rem; }
+@media (max-width: 640px) { .pr-ex-edit { grid-column: auto; } }
