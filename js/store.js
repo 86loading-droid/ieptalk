@@ -206,13 +206,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 5) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 6) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 5, school: defaultSchool(), c: {} };
+    const d = { v: 6, school: defaultSchool(), c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));
@@ -222,6 +222,14 @@ function makeDemoStore() {
     sd.incidents.forEach((x) => put(pathOf('incidents'), x));
     Object.entries(sd.accoms).forEach(([sid, as]) => as.forEach((x) => put(pathOf('accoms', { sid }), x)));
     const now = Date.now();
+    // 관찰 메모 예시(가상 학생 하람)
+    const nd = (k) => { const x = new Date(); while (x.getDay() === 0 || x.getDay() === 6) x.setDate(x.getDate() - 1); for (let i = 0; i < k;) { x.setDate(x.getDate() - 1); if (x.getDay() !== 0 && x.getDay() !== 6) i++; } return todayStr(x); }; // 평일만 거슬러 감
+    [[0, '09:55', 2, '국어', '수업 중', ['학습 반응'], '받아쓰기 10문항 중 7문항 바르게 씀. 3번째 문항부터 「도와주세요」 카드를 스스로 냄.', true],
+     [0, '12:20', 0, '', '점심·급식', ['사회성·또래'], '옆자리 친구에게 「물 줄까?」라고 먼저 말함(처음 관찰).', false],
+     [1, '10:45', 3, '수학', '모둠·짝 활동', ['행동 관찰'], '짝 활동 5분 뒤 자리에서 일어나 교실 뒤로 감. 타이머를 보여 주자 2분 뒤 돌아옴.', false],
+     [2, '08:40', 0, '', '등교', ['건강·컨디션', '보호자 연락'], '보호자 알림장: 어젯밤 늦게 잠듦. 1교시 중 하품 여러 차례.', false],
+     [4, '13:10', 5, '체육', '수업 중', ['잘한 점·성장', 'IEP 목표 관련'], '줄 서기에서 차례를 끝까지 기다림(약 3분). IEP 목표 「차례 기다리기」 관련.', true]
+    ].forEach(([k, time, period, subj, sit, tags, text, star], i) => put(pathOf('memos', { sid: 's1' }), { id: `nt${i + 1}`, kind: 'note', date: nd(k), time, period, subj, sit, tags, text, star, title: '', blocks: [], createdBy: i % 2 ? 'u-t2' : 'u-admin', updatedBy: i % 2 ? 'u-t2' : 'u-admin', createdAt: now - k * 864e5, updatedAt: now - k * 864e5 }));
     put(pathOf('rooms'), { id: 'r-s1', type: 'student', studentId: 's1', name: '하람(가명) IEP팀', memberUids: ['u-admin', 'u-t2'], lastAt: now - 3600e3, lastBy: 'u-t2', lastText: '오늘 국어 시간에 카드 교환이 두 번 있었어요.', readBy: { 'u-admin': now - 7200e3, 'u-t2': now } });
     put(pathOf('messages', { rid: 'r-s1' }), { id: 'm1', by: 'u-admin', at: now - 7300e3, kind: 'text', text: '하람이 소리 지르기 기초선 6회기째입니다. 이번 주 안에 중재 시작을 논의하면 좋겠습니다.' });
     put(pathOf('messages', { rid: 'r-s1' }), { id: 'm2', by: 'u-t2', at: now - 3600e3, kind: 'text', text: '오늘 국어 시간에 카드 교환이 두 번 있었어요.' });
