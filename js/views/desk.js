@@ -27,6 +27,14 @@ export function saveDesk(patch) {
   return Promise.resolve(S.store.create('desks', {}, next, S.me.uid)).catch((e) => toast('저장하지 못했습니다: ' + e.message));
 }
 
+// 어느 날짜·시각이 몇 교시이고 내 시간표에서 무슨 교과인지(관찰 메모 자동 채우기용)
+export function periodAt(date, hm) {
+  if (!date || !hm) return { p: 0, subj: '' };
+  const wd = parseDate(date).getDay(), n = mins(hm), ps = periods();
+  for (let i = 0; i < ps.length; i++) { const [s, e] = ps[i].map(mins); if (n >= s - 5 && n < e) return { p: i + 1, subj: wd >= 1 && wd <= 5 ? cell(wd, i + 1) : '' }; }
+  return { p: 0, subj: '' };
+}
+
 // 지금 몇 교시인지, 쉬는 시간인지, 다음 시간은 무엇인지
 export function nowInfo() {
   const wd = weekday(), ps = periods(), n = nowMin(), L = lunch();

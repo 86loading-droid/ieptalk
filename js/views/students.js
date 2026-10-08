@@ -3,6 +3,7 @@ import { esc, todayStr, fmtDate, addDays, openModal, toast, newId } from '../uti
 import { S, on, rerender, useSub, go, teachers, aides, nameOf, labelOf, avatar, student, isTeacher } from '../state.js';
 import { progressChart, progressWarning, behaviorChart, behaviorSeries, baselineStats, ioaDays, METHOD_LABEL, INT_LABEL } from '../charts.js';
 import { crisisTab, incidentDates, reviewWarning } from './incidents.js';
+import { notesTab, isNote } from './notes.js';
 import { accomTab, accomsOf, needsMyConfirm } from './accoms.js';
 import { logAccess } from '../access.js';
 import { recordCard, eventRow, confirmInline, ANTECEDENTS, CONSEQUENCES } from './record.js';
@@ -44,9 +45,9 @@ function detail(sid, tab, args = []) {
   const s = student(sid);
   if (!s) return '<section class="card"><p>학생을 찾을 수 없습니다.</p><a href="#/students">목록으로</a></section>';
   const nAcc = accomsOf(sid).filter(needsMyConfirm).length;
-  const tabs = [['goals', 'IEP 목표·진전도'], ['behavior', '행동·기초선'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모']];
+  const tabs = [['goals', 'IEP 목표·진전도'], ['note', '관찰 메모'], ['behavior', '행동·기초선'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모']];
   logAccess(sid, 'view', tab === 'goals' ? 'goals_tab' : tab);
-  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : goalsTab(s);
+  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'note' ? notesTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : goalsTab(s);
   return `<a class="back" href="#/students">‹ 학생 목록</a>
   <div class="page-head"><h1>${esc(s.alias)} <small class="muted">${esc(s.grade || '')}</small></h1>
     <div class="btns"><button type="button" class="ghost" data-act="stu-room" data-sid="${sid}">팀 대화방</button>
@@ -252,7 +253,7 @@ on('stu-room', (el) => openStudentRoom(el.dataset.sid));
 /* ---------- 공유 메모(블록 문서) ---------- */
 function memoTab(s) {
   useSub('memo:' + s.id, 'memos', { sid: s.id }, (r) => { S.memosBy[s.id] = r.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); });
-  const memos = S.memosBy[s.id] || [];
+  const memos = (S.memosBy[s.id] || []).filter((m) => !isNote(m));
   const openId = S.ui.memo?.[s.id] || memos[0]?.id;
   const cur = memos.find((m) => m.id === openId);
   const list = memos.map((m) => `<button type="button" class="memo-item ${m.id === openId ? 'on' : ''}" data-act="memo-open" data-sid="${s.id}" data-mid="${m.id}"><b>${esc(m.title || '제목 없음')}</b><small class="muted">${esc(nameOf(m.updatedBy))} · ${m.updatedAt ? new Date(m.updatedAt).toLocaleDateString('ko-KR') : ''}</small></button>`).join('');
