@@ -7,6 +7,7 @@ import { esc, todayStr, addDays, openModal, toast } from '../util.js';
 import { S, on, student } from '../state.js';
 import { COURSES, DISABILITIES, SUBJECTS, SUBJECT_GROUPS, LEVELS } from './iepdata.js';
 import { copyText } from './pireport.js';
+import { goalMissing } from './students.js';
 import { loadIndex, loadSubject, loadUnits, GRADES, bandOf, findStd, guidanceOf, suggestStds, sourceLine } from './curriculum.js';
 
 // 받침에 따라 을/를, 이/가
@@ -163,7 +164,7 @@ export function stdIepText(o) {
 export function openIepGen(sid) {
   const s0 = student(sid);
   const st = { sid, mode: 'std', grade: gradeFromStudent(s0), subj: '', unit: '', unitFree: '', lesson: '', lessonFree: '', code: '', dis: [], level: '', part: '', resp: [], base: '', period: 'term',
-    course: '', area: '' };
+    course: '', area: '', ed: {} };
   const D = { idx: null, units: null, subj: {}, err: '' };
   let modal = null;
   const paint = () => {
@@ -184,6 +185,32 @@ export function openIepGen(sid) {
     const hit = subj && st.code ? findStd(subj, band, st.code) : null;
     return { band, meta, subj, hit, guide: guidanceOf(hit) };
   };
+
+  // 편집 가능한 초안: 모드마다 {base(마지막으로 만든 초안), text(교사가 고친 글), g(목표 카드 조건·행동·기준)}
+  const GF = [['condition', '조건(언제·어떤 상황에서)'], ['behavior', '행동(관찰 가능한 동사)'], ['criterion', '기준(얼마나·몇 번)']];
+  const edOf = (o, gen) => {
+    const cur = st.ed[st.mode];
+    const g0 = { condition: o.goal.condition, behavior: o.goal.behavior, criterion: o.goal.criterion };
+    if (!cur || (!cur.dirty && cur.base !== gen)) st.ed[st.mode] = { base: gen, text: gen, g: g0, g0, dirty: false };
+    else if (cur.base !== gen) cur.next = { base: gen, g0 };
+    else delete cur.next;
+    return st.ed[st.mode];
+  };
+  function draftBox(o, gen, hint) {
+    const e = edOf(o, gen);
+    const rows = Math.min(28, Math.max(12, e.text.split('\n').length + 2));
+    return `${e.next ? `<div class="alert warn small ig-stale" role="status">선택을 바꾸어 새 초안이 준비되었습니다. 지금 글상자에는 선생님이 고친 글이 그대로 있습니다.
+        <button type="button" class="sm" data-ig-act="redraft">새 초안으로 바꾸기</button></div>` : ''}
+      <div class="ig-edhead"><label for="ig-draft" class="small"><b>IEP 초안</b> <span class="tiny muted" data-ig-state>${e.dirty ? '· 고친 글' : '· 자동 초안'}</span></label><span class="grow"></span>
+        <button type="button" class="ghost sm" data-ig-act="reset" ${e.dirty ? '' : 'hidden'}>처음 초안으로 되돌리기</button></div>
+      <textarea id="ig-draft" class="ig-doc ig-edit" data-igin="draft" rows="${rows}" spellcheck="false" aria-describedby="ig-hint">${esc(e.text)}</textarea>
+      <details class="ig-gf" ${e.gopen ? 'open' : ''}><summary class="small">목표 카드에 들어갈 조건·행동·기준 고치기 <small class="muted">(진전도 그래프·경고에 쓰임)</small></summary>
+        ${GF.map(([k, l]) => `<label class="small">${l}<input data-iggf="${k}" value="${esc(e.g[k] || '')}"></label>`).join('')}
+        <p class="tiny muted" data-ig-miss>${esc(missLine(e.g))}</p></details>
+      <div class="bar"><button type="button" class="primary" data-ig-act="copy">복사</button><button type="button" class="ghost" data-ig-act="save">IEP 목표로 저장</button></div>
+      <p class="tiny muted" id="ig-hint">${esc(hint)}</p>`;
+  }
+  const missLine = (g) => { const m = goalMissing(g); return m.length ? `아직 빠진 요소: ${m.join(', ')}` : '조건·행동·기준이 모두 들어 있습니다.'; };
 
   function stdBody() {
     if (D.err) return `<p class="alert">${esc(D.err)}</p>`;
@@ -229,9 +256,7 @@ export function openIepGen(sid) {
           : isEl ? '' : '<p class="tiny muted">이 성취기준에는 중도중복장애 학생을 따로 언급한 고려 사항이 없습니다. 아래 일반 고려 사항을 참고하세요.</p>'}
         ${guide.other.length ? `<details><summary class="small">그 밖의 적용 시 고려 사항 ${guide.other.length}개</summary><ul>${guide.other.map((x) => `<li class="small">${x.l ? `<b>${esc(x.l)}</b> ` : ''}${esc(x.x)}${x.own ? '' : ' <small class="muted">(영역 공통)</small>'}</li>`).join('')}</ul></details>` : ''}
         <p class="tiny muted">${esc(sourceLine(D.idx))}</p></section>` : ''}
-      ${o ? `<div class="ig-doc" tabindex="0">${esc(stdIepText(o))}</div>
-      <div class="bar"><button type="button" class="primary" data-ig-act="copy">복사</button><button type="button" class="ghost" data-ig-act="save">IEP 목표로 저장</button></div>
-      <p class="tiny muted">문장은 초안입니다. 학생 관찰 사실과 학교 진도에 맞게 고쳐 씁니다.</p>`
+      ${o ? draftBox(o, stdIepText(o), '문장은 초안입니다. 글상자 안을 바로 고쳐 쓰면 복사·저장에 고친 글이 그대로 들어갑니다.')
       : `<p class="muted">왼쪽에서 학년 → 교과 → (단원·차시) → ${isEl ? '내용 요소' : '성취기준'}을 고르면 원문 안내와 IEP 초안이 나옵니다.</p>`}
     </div></div>`;
   }
@@ -248,9 +273,7 @@ export function openIepGen(sid) {
       ${st.area ? `<h3 class="ig-h">5. 현행 수준</h3>${chips('level', LEVELS)}
         <div class="row2"><label>현재 정반응(%) <input type="number" min="0" max="100" data-igin="base" value="${esc(st.base)}" placeholder="예: 30"></label>
         <label>목표 기간<select data-igin="period"><option value="term" ${st.period === 'term' ? 'selected' : ''}>한 학기</option><option value="year" ${st.period === 'year' ? 'selected' : ''}>한 학년</option></select></label></div>` : ''}
-    </div><div class="ig-out">${o ? `<div class="ig-doc" tabindex="0">${esc(iepText(o))}</div>
-      <div class="bar"><button type="button" class="primary" data-ig-act="copy">복사</button><button type="button" class="ghost" data-ig-act="save">IEP 목표로 저장</button></div>
-      <p class="tiny muted">수준을 고르지 않으면 과정에 맞는 기본 수준으로 만듭니다. 문장은 초안이며 학생 관찰 사실로 고쳐 씁니다.</p>`
+    </div><div class="ig-out">${o ? draftBox(o, iepText(o), '수준을 고르지 않으면 과정에 맞는 기본 수준으로 만듭니다. 글상자 안을 바로 고쳐 쓰면 복사·저장에 고친 글이 그대로 들어갑니다.')
       : '<p class="muted">왼쪽에서 과정 → 교과·영역 → 하위 영역을 고르면 IEP 초안이 바로 만들어집니다.</p>'}</div></div>`;
   }
 
@@ -278,21 +301,39 @@ export function openIepGen(sid) {
         const a = e.target.closest('[data-ig-act]'); if (!a) return;
         const o = st.mode === 'life' ? buildIep({ ...st, subj: st.subj2 }) : buildStdIep(st, ctxOf());
         if (!o) return;
-        const text = st.mode === 'life' ? iepText(o) : stdIepText(o);
-        if (a.dataset.igAct === 'copy') { const ok = await copyText(text); toast(ok ? 'IEP 초안을 복사했습니다' : '복사하지 못했습니다'); }
-        if (a.dataset.igAct === 'save') {
-          const t = todayStr();
-          await S.store.create('goals', { sid }, { ...o.goal, status: '진행', startDate: t, targetDate: addDays(t, st.period === 'year' ? 300 : 112), points: [], note: text, createdBy: S.me.uid, updatedBy: S.me.uid, createdAt: Date.now(), updatedAt: Date.now() });
-          toast('IEP 목표로 저장했습니다. 목표 카드에서 측정값을 넣으세요');
+        const ed = st.ed[st.mode];
+        const act = a.dataset.igAct;
+        if (act === 'redraft' && ed?.next) { st.ed[st.mode] = { base: ed.next.base, text: ed.next.base, g: { ...ed.next.g0 }, g0: ed.next.g0, dirty: false }; return paint(); }
+        if (act === 'reset' && ed) { if (!a.dataset.armed) { a.dataset.armed = '1'; a.textContent = '한 번 더 누르면 고친 글이 지워집니다'; setTimeout(() => { delete a.dataset.armed; a.textContent = '처음 초안으로 되돌리기'; }, 3000); return; } st.ed[st.mode] = { base: ed.next?.base || ed.base, text: ed.next?.base || ed.base, g: { ...(ed.next?.g0 || ed.g0) }, g0: ed.next?.g0 || ed.g0, dirty: false }; return paint(); }
+        const box = m.querySelector('[data-igin="draft"]');
+        const text = box ? box.value : (ed?.text || '');
+        if (act === 'copy') { const ok = await copyText(text); toast(ok ? 'IEP 초안을 복사했습니다' : '복사하지 못했습니다'); }
+        if (act === 'save') {
+          const t = todayStr(); const g = ed?.g || {};
+          await S.store.create('goals', { sid }, { ...o.goal, condition: g.condition ?? o.goal.condition, behavior: g.behavior ?? o.goal.behavior, criterion: g.criterion ?? o.goal.criterion,
+            status: '진행', startDate: t, targetDate: addDays(t, st.period === 'year' ? 300 : 112), points: [], note: text, edited: !!ed?.dirty, createdBy: S.me.uid, updatedBy: S.me.uid, createdAt: Date.now(), updatedAt: Date.now() });
+          toast('IEP 목표로 저장했습니다. 목표 카드에서 측정값을 넣고, 문서는 「IEP 문서」에서 다시 고칠 수 있습니다');
         }
       });
       m.addEventListener('change', (e) => {
-        const k = e.target.dataset.igin; if (!k) return;
+        const k = e.target.dataset.igin; if (!k || k === 'draft') return;
         st[k] = e.target.value;
         if (k === 'unit') { st.lesson = ''; }
         paint();
       });
-      m.addEventListener('input', (e) => { const k = e.target.dataset.igin; if (k && ['unitFree', 'lessonFree'].includes(k)) { st[k] = e.target.value; } });
+      m.addEventListener('input', (e) => {
+        const k = e.target.dataset.igin;
+        if (k && ['unitFree', 'lessonFree'].includes(k)) { st[k] = e.target.value; return; }
+        const ed = st.ed[st.mode]; if (!ed) return;
+        if (k === 'draft') {
+          ed.text = e.target.value; ed.dirty = ed.text !== ed.base;
+        } else if (e.target.dataset.iggf) {
+          ed.g[e.target.dataset.iggf] = e.target.value; ed.gopen = true; ed.dirty = true;
+          const mm = m.querySelector('[data-ig-miss]'); if (mm) mm.textContent = missLine(ed.g);
+        } else return;
+        const sEl = m.querySelector('[data-ig-state]'); if (sEl) sEl.textContent = ed.dirty ? '· 고친 글' : '· 자동 초안';
+        const r = m.querySelector('[data-ig-act="reset"]'); if (r) r.hidden = !ed.dirty;
+      });
       m.addEventListener('focusout', (e) => { const k = e.target.dataset?.igin; if (k && ['unitFree', 'lessonFree'].includes(k)) paint(); });
     }
   });

@@ -9,6 +9,7 @@ import { solutionPanel } from './solution.js';
 import { openIepGen } from './iepgen.js';
 import { termTab } from './termreport.js';
 import { flowTab } from './iepflow.js';
+import { monitorTab } from './monitor.js';
 import './visuals.js';
 import { accomTab, accomsOf, needsMyConfirm } from './accoms.js';
 import { logAccess } from '../access.js';
@@ -31,12 +32,12 @@ export function warningsFor(sid) {
 }
 
 export function render(route) {
-  if (route.name === 'student' && route.args[0]) return detail(route.args[0], route.args[1] || 'goals', route.args.slice(2));
+  if (route.name === 'student' && route.args[0]) return detail(route.args[0], route.args[1] || 'now', route.args.slice(2));
   const cards = S.students.map((s) => {
     const w = warningsFor(s.id).length;
     const gs = S.goalsBy[s.id] || [];
     const ts = S.targetsBy[s.id] || [];
-    return `<a class="card stu-card" href="#/student/${s.id}/goals">
+    return `<a class="card stu-card" href="#/student/${s.id}/now">
       <div class="stu-top"><h2 class="h3">${esc(s.alias)}</h2><span class="muted">${esc(s.grade || '')}</span>${w ? `<span class="tag warn">진전도 경고 ${w}</span>` : ''}</div>
       <p class="muted small">${esc(s.note || '')}</p>
       <p class="small">담당 ${esc(nameOf(s.caseManager))} · 목표 ${gs.length}개 · 표적행동 ${ts.length}개</p>
@@ -51,9 +52,9 @@ function detail(sid, tab, args = []) {
   const s = student(sid);
   if (!s) return '<section class="card"><p>학생을 찾을 수 없습니다.</p><a href="#/students">목록으로</a></section>';
   const nAcc = accomsOf(sid).filter(needsMyConfirm).length;
-  const tabs = [['flow', 'IEP 전체 흐름'], ['goals', 'IEP 목표·진전도'], ['note', '관찰 메모'], ['behavior', '행동·기초선'], ['fba', '기능평가'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모'], ['term', '학기말 종합']];
+  const tabs = [['now', '지금 현황'], ['flow', 'IEP 전체 흐름'], ['goals', 'IEP 목표·진전도'], ['note', '관찰 메모'], ['behavior', '행동·기초선'], ['fba', '기능평가'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모'], ['term', '학기말 종합']];
   logAccess(sid, 'view', tab === 'goals' ? 'goals_tab' : tab);
-  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'note' ? notesTab(s) : tab === 'fba' ? fbaTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : tab === 'term' ? termTab(s) : tab === 'flow' ? flowTab(s) : goalsTab(s);
+  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'note' ? notesTab(s) : tab === 'fba' ? fbaTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : tab === 'term' ? termTab(s) : tab === 'flow' ? flowTab(s) : tab === 'now' ? monitorTab(s) : goalsTab(s);
   return `<a class="back" href="#/students">‹ 학생 목록</a>
   <div class="page-head"><h1>${esc(s.alias)} <small class="muted">${esc(s.grade || '')}</small></h1>
     <div class="btns"><button type="button" class="ghost" data-act="stu-room" data-sid="${sid}">팀 대화방</button>
@@ -79,6 +80,8 @@ function goalsTab(s) {
       ${miss.length ? `<p class="alert small">측정 가능한 목표가 되려면 ${miss.join(', ')}이(가) 필요합니다.</p>` : ''}
       ${w ? `<div class="alert warn" role="alert"><b>진전도 경고</b> 최근 ${n}회 연속 목표선에 못 미쳤습니다. 교수 방법이나 목표 조정을 팀과 협의하세요.
         <button type="button" class="sm" data-act="warn-meet" data-sid="${s.id}" data-gid="${g.id}">팀 회의 예약</button></div>` : ''}
+      ${g.note ? `<details class="goal-doc"><summary class="small">IEP 문서${g.edited ? ' <small class="muted">(교사가 고친 글)</small>' : ''}</summary><div class="ig-doc small">${esc(g.note)}</div>
+        <button type="button" class="ghost sm" data-act="goal-edit" data-sid="${s.id}" data-gid="${g.id}" data-focus="note">문서 고치기</button></details>` : ''}
       ${progressChart(g, w)}
       <form class="inline-form" data-gid="${g.id}" data-sid="${s.id}">
         <label>날짜<input type="date" name="d" value="${todayStr()}" required></label>
@@ -102,6 +105,7 @@ function goalForm(g = {}) {
     <label>행동(관찰 가능한 동사)<input name="behavior" value="${esc(g.behavior || '')}" placeholder="예: 원하는 활동 카드를 골라 교사에게 건넨다"></label>
     <label>기준(얼마나·몇 번)<input name="criterion" value="${esc(g.criterion || '')}" placeholder="예: 10회 기회 중 8회 이상, 3회기 연속"></label>
     <p class="hint" data-miss></p>
+    <label>IEP 문서(현행 수준·단기 목표·평가·지원 등, 바로 고쳐 씁니다)<textarea name="note" rows="${g.note ? 14 : 4}" placeholder="IEP 생성기로 만들면 초안이 들어옵니다. 직접 적어도 됩니다.">${esc(g.note || '')}</textarea></label>
     <div class="row2"><label>측정 단위<input name="measure" value="${esc(g.measure || '정반응률(%)')}"></label>
     <label>좋아지는 방향<select name="direction"><option value="up" ${g.direction !== 'down' ? 'selected' : ''}>값이 커질수록 좋음</option><option value="down" ${g.direction === 'down' ? 'selected' : ''}>값이 작아질수록 좋음</option></select></label></div>
     <div class="row2"><label>기초 수준(현재 값)<input type="number" step="any" name="baseline" value="${esc(g.baseline ?? '')}" required></label>
@@ -117,10 +121,10 @@ function bindGoalForm(m, sid, g) {
   const del = m.querySelector('[data-del]');
   if (del) del.onclick = async () => { if (!confirmInline(del)) return; await S.store.remove('goals', { sid }, g.id); m.closest('.modal-back').remove(); toast('목표를 지웠습니다'); };
 }
-const goalData = (fd) => ({ domain: fd.get('domain'), status: fd.get('status'), condition: fd.get('condition'), behavior: fd.get('behavior'), criterion: fd.get('criterion'), measure: fd.get('measure'), direction: fd.get('direction'), baseline: Number(fd.get('baseline')), target: Number(fd.get('target')), startDate: fd.get('startDate'), targetDate: fd.get('targetDate'), updatedBy: S.me.uid, updatedAt: Date.now() });
+const goalData = (fd) => ({ domain: fd.get('domain'), status: fd.get('status'), condition: fd.get('condition'), behavior: fd.get('behavior'), criterion: fd.get('criterion'), measure: fd.get('measure'), direction: fd.get('direction'), baseline: Number(fd.get('baseline')), target: Number(fd.get('target')), startDate: fd.get('startDate'), targetDate: fd.get('targetDate'), note: fd.get('note') || '', updatedBy: S.me.uid, updatedAt: Date.now() });
 
 on('goal-new', (el) => { const sid = el.dataset.sid; openModal(goalForm(), { wide: true, onOpen: (m) => bindGoalForm(m, sid, {}), onSubmit: async (fd) => { await S.store.create('goals', { sid }, { ...goalData(fd), points: [], createdBy: S.me.uid, createdAt: Date.now() }); toast('목표를 추가했습니다'); } }); });
-on('goal-edit', (el) => { const { sid, gid } = el.dataset; const g = (S.goalsBy[sid] || []).find((x) => x.id === gid); openModal(goalForm(g), { wide: true, onOpen: (m) => bindGoalForm(m, sid, g), onSubmit: async (fd) => { await S.store.update('goals', { sid }, gid, goalData(fd)); toast('목표를 저장했습니다'); } }); });
+on('goal-edit', (el) => { const { sid, gid, focus } = el.dataset; const g = (S.goalsBy[sid] || []).find((x) => x.id === gid); openModal(goalForm(g), { wide: true, onOpen: (m) => { bindGoalForm(m, sid, g); if (focus) { const t = m.querySelector(`[name="${focus}"]`); t?.focus(); t?.scrollIntoView({ block: 'center' }); } }, onSubmit: async (fd) => { const d = goalData(fd); if (g.note && d.note !== g.note) d.edited = true; await S.store.update('goals', { sid }, gid, d); toast('목표를 저장했습니다'); } }); });
 on('pt-del', async (el) => {
   if (!confirmInline(el)) return;
   const { sid, gid, d, v } = el.dataset; const g = (S.goalsBy[sid] || []).find((x) => x.id === gid);
