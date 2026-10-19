@@ -9,13 +9,13 @@ const AS = { admin: 'u-admin', teacher: 'u-t2', aide: 'u-a1' };
 const KEY = 'ieptalk-tour';
 
 const STEPS_T = [
-  ['#/today', '한눈에', '첫 화면입니다. 법정 기한, 진전도 경고, 위기행동 사후 기록 요청, 평가조정 확인 요청이 담벼락처럼 모입니다.'],
+  ['#/today', '첫 화면 「한눈에」', '왼쪽 메뉴(휴대폰은 아래 메뉴) 맨 위 「한눈에」 화면입니다. 법정 기한, 진전도 경고, 위기행동 사후 기록 요청, 평가조정 확인 요청이 담벼락처럼 모입니다.'],
   ['#/student/s1/now', '학생 지금 현황', '학생을 열면 가장 먼저 나오는 한 장입니다. 신호등 요약, IEP 단계 도식, 목표 진전 막대(기대 위치와 비교), 문제행동 그래프, 행동 기능 도식, 최근 30일 시간선, 다음 할 일이 모입니다.'],
-  ['#/student/s1/flow', 'IEP 전체 흐름', '가상 학생 하람의 IEP를 학생 이해 → 평가 → 목표 → 교수·지원 → 행동 지원 → 진전도 → 학기말 평가의 일곱 단계로 이어 봅니다. 「전체 인쇄」로 한 문서가 됩니다.'],
+  ['#/student/s1/flow', 'IEP 전체 흐름', '학생을 가운데 두고 학생 이해 → 평가 → 목표 → 교수·지원 → 행동 지원 → 진전도 → 학기말 평가가 고리로 이어진 큰 그림입니다. 점선은 영역끼리 주고받는 자료(기능 가설 → 중재 전략 등)입니다. 영역을 누르면 내용이 아래에 펼쳐지고, 작은 글씨를 누르면 그 기록으로 갑니다.', '.fm-node[data-k="assess"]'],
   ['#/student/s1/goals', 'IEP 생성기', '학년 → 교과 → 단원 → 차시 → 성취기준을 고르면 2022 개정 기본 교육과정 원문과 중도중복장애 학생 지도 내용이 함께 나오고, 학생 요구에 맞춘 수준별 목표 초안이 만들어집니다. 초안은 글상자 안에서 바로 고쳐 쓰고 그대로 저장합니다.', '[data-act="iep-gen"]'],
   ['#/student/s1/behavior', '행동 기록과 기초선 분석', '버튼으로 모은 행동 자료를 그래프로 보고, 수준·추세·변동성·중첩 등 시각적 분석과 기능에 맞춘 중재 전략을 제안받습니다.'],
   ['#/student/s1/fba', '기능평가', 'ABC 관찰기록, 문제행동 동기평가, 의사소통기능평가를 합쳐 행동의 기능 가설을 세웁니다. 빈 서식도 인쇄할 수 있습니다.'],
-  ['#/student/s1/flow', '행동지원 시각자료', '그림 일과표, 먼저-다음 판, 휴식 요청 카드처럼 행동 중재에 쓰는 그림을 골라 IEP에 넣고 큰 카드로 인쇄합니다. 기능평가 결과에 맞는 그림을 추천합니다.', '[data-act="vis-pick"]'],
+  ['#/student/s1/flow', '행동 지원과 시각자료', '큰 그림에서 「행동 지원」을 누르면 기능에 맞춘 중재 전략과, 학생에게 고른 행동지원 그림(그림 일과표·먼저-다음 판·휴식 요청 카드 등)이 펼쳐집니다. 그림은 그 안의 「시각자료 고르기」로 바꿉니다.', '.fm-node[data-k="beh"]'],
   ['#/student/s1/crisis', '위기행동 사후 기록', '위기행동 뒤 기록, 보고, 보호자 통지, 사후 검토 회의를 단계별로 관리하고 신체적 개입 사후 보고서를 버튼으로 만듭니다.'],
   ['#/student/s1/note', '관찰 메모', '날짜·교과·상황·종류를 눌러 한두 줄로 적는 누가 기록입니다.'],
   ['#/student/s1/term', '학기말 종합', '한 학기 동안 쌓인 진전도·행동·기능평가·위기행동·관찰 메모·평가조정을 한 문서로 모으고 종합 의견 초안을 만듭니다.'],
@@ -58,7 +58,7 @@ function go(i) {
   document.querySelector('.modal-back [data-close]')?.click();
   if (location.hash !== hash) location.hash = hash; else renderTour();
   renderTour();
-  if (open) setTimeout(() => document.querySelector(`#main ${open}, ${open}`)?.click(), 700);
+  if (open) setTimeout(() => { const t = document.querySelector(`#main ${open}, ${open}`); if (t && !(t.getAttribute('aria-pressed') === 'true')) t.dispatchEvent(new MouseEvent('click', { bubbles: true })); }, 700);
   window.scrollTo(0, 0);
 }
 function onClick(e) {

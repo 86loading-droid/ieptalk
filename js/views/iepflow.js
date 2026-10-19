@@ -3,7 +3,7 @@
 // 각 단계는 이미 쌓인 자료(관찰 메모·기초선·기능평가·목표·평가조정·시각자료·사후 기록·학기말 종합)를 모아 보여 주고,
 // 고칠 곳은 해당 탭으로 보낸다. 「전체 인쇄」는 이 흐름을 그대로 한 문서로 인쇄한다(정해진 서식 없음).
 import { esc, todayStr, fmtDate, addDays } from '../util.js';
-import { S, on, useSub, student, labelOf, nameOf } from '../state.js';
+import { S, on, useSub, student, labelOf, nameOf, rerender } from '../state.js';
 import { behaviorSeries, METHOD_LABEL } from '../charts.js';
 import { visualAnalysis, STRAT } from './solution.js';
 import { profileFor, abcSummary, hypothesis, masOf, abcOf, commOf, COMM_FNS, FN } from './fba.js';
@@ -89,25 +89,121 @@ function stepBody(k, f, sid, print) {
   return '';
 }
 
+// 큰 그림: 일곱 영역을 학생 둘레에 고리로 놓고, 영역 사이 흐름(실선)과 서로 주고받는 자료(점선)를 잇는다.
+// 영역을 누르면 아래에 그 영역 내용이 펼쳐지고, 작은 글씨(하위 기록)를 누르면 해당 기록 화면으로 간다.
+const NODE_TABS = {
+  know: [['관찰 메모', 'note'], ['학생 정보', 'now']],
+  assess: [['기초선', 'behavior'], ['기능평가', 'fba']],
+  goals: [['IEP 목표', 'goals']],
+  plan: [['평가조정', 'accom'], ['IEP 목표', 'goals']],
+  beh: [['행동 기록', 'behavior'], ['위기행동', 'crisis']],
+  prog: [['측정값', 'goals'], ['그래프', 'behavior']],
+  term: [['학기말 종합', 'term']]
+};
+// 영역 사이 연결: [보내는 영역, 받는 영역, 무엇이 넘어가는지]
+const LINKS = [
+  ['know', 'assess', '관찰한 사실'], ['assess', 'goals', '현행 수준'], ['goals', 'plan', '목표에 맞춘 지원'], ['plan', 'beh', '수업 속 지원'],
+  ['beh', 'prog', '중재 기록'], ['prog', 'term', '한 학기 변화'], ['term', 'know', '다음 IEP로']
+];
+const CROSS = [['assess', 'beh', '기능 가설 → 중재 전략'], ['prog', 'goals', '경고 → 목표 조정'], ['know', 'plan', '장애 특성 → 지원·조정']];
+
+function nodeFacts(k, f) {
+  const n = (x) => x.length;
+  if (k === 'know') return [`관찰 메모 ${n(f.notes)}건`, `최근 30일 ${n(f.recent)}건`];
+  if (k === 'assess') { const hyp = f.targets.find((x) => x.p.top); return [`기초선 ${f.targets.filter((x) => x.va.a).length}/${n(f.targets)}개 행동`, hyp ? `기능: ${FN[hyp.p.top]}` : `기능평가 ${n(f.mas) + n(f.abc) + (f.comm ? 1 : 0)}건`]; }
+  if (k === 'goals') return [`목표 ${n(f.goals)}개`, `성취기준 연결 ${f.goals.filter((x) => x.g.std?.text).length}개`];
+  if (k === 'plan') return [`지원·조정 ${new Set(f.goals.flatMap((x) => x.sup)).size}가지`, `평가조정 ${n(f.accs)}과목`];
+  if (k === 'beh') return [`중재 ${f.targets.filter((x) => x.t.interventionStart).length}/${n(f.targets)}개 행동`, `그림 ${n(f.vis)} · 사후 기록 ${n(f.incs)}`];
+  if (k === 'prog') { const m = f.goals.reduce((a, x) => a + x.vals.length, 0); return [`측정 ${m}회`, `도달 ${f.goals.filter((x) => x.met).length}/${n(f.goals)}`]; }
+  if (k === 'term') return f.term ? ['종합 저장됨', `${f.term.from || ''}~`] : ['아직 없음', '학기말에 작성'];
+  return [];
+}
+
+function fmNodes(f, sid, sel, pos, nw, nh, print) {
+  return STEPS.map(([k, l], i) => { const [x, y] = pos[k]; const st = f.status[k]; const facts = nodeFacts(k, f);
+    const chips = print ? '' : NODE_TABS[k].map(([cl, tab], j) => `<a href="#/student/${sid}/${tab}" class="fm-chip"><text x="${x - nw / 2 + 14 + j * 92}" y="${y + nh / 2 - 12}">${esc(cl)} ›</text></a>`).join('');
+    return `<g class="fm-node ${st} ${sel === k ? 'sel' : ''}" ${print ? '' : `data-act="fl-node" data-k="${k}" data-sid="${sid}" role="button" tabindex="0" aria-pressed="${sel === k}" aria-label="${i + 1}. ${esc(l)} — ${esc(facts.join(', '))}. 눌러서 내용 보기"`}>
+      <rect x="${x - nw / 2}" y="${y - nh / 2}" width="${nw}" height="${nh}" rx="16" class="fm-box"/>
+      <circle cx="${x - nw / 2 + 22}" cy="${y - nh / 2 + 22}" r="13" class="fm-num"/><text x="${x - nw / 2 + 22}" y="${y - nh / 2 + 27}" class="fm-numt">${st === 'ok' ? '✓' : i + 1}</text>
+      <text x="${x - nw / 2 + 42}" y="${y - nh / 2 + 28}" class="fm-t">${esc(l)}</text>
+      ${facts.map((t, j) => `<text x="${x - nw / 2 + 14}" y="${y - nh / 2 + 52 + j * 18}" class="fm-f">${esc(t)}</text>`).join('')}
+    </g>${chips}`; }).join('');
+}
+export function flowMap(f, sid, sel = '', print = false) {
+  const W = 1000, H = 640, cx = 500, cy = 318, rx = 375, ry = 232, nw = 210, nh = 104;
+  const pos = {}; STEPS.forEach(([k], i) => { const a = (-90 + (360 / STEPS.length) * i) * Math.PI / 180; pos[k] = [cx + rx * Math.cos(a), cy + ry * Math.sin(a)]; });
+  const edge = ([x1, y1], [x2, y2], hw, hh) => { const dx = x2 - x1, dy = y2 - y1; const t = Math.min(hw / Math.abs(dx || 1e-6), hh / Math.abs(dy || 1e-6)); return [x1 + dx * t, y1 + dy * t]; };
+  const seg = (a, b, pad = 6) => { const p1 = edge(pos[a], pos[b], nw / 2 + pad, nh / 2 + pad), p2 = edge(pos[b], pos[a], nw / 2 + pad, nh / 2 + pad); return [p1, p2]; };
+  const flow = LINKS.map(([a, b, l]) => { const [[x1, y1], [x2, y2]] = seg(a, b); const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; const ox = (mx - cx) * 0.06, oy = (my - cy) * 0.06;
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="fm-flow" marker-end="url(#fm-ar)"/><text x="${mx + ox}" y="${my + oy}" class="fm-ll">${esc(l)}</text>`; }).join('');
+  const cross = CROSS.map(([a, b, l]) => { const [[x1, y1], [x2, y2]] = seg(a, b, 8); const qx = (x1 + x2) / 2 + (cx - (x1 + x2) / 2) * 0.35, qy = (y1 + y2) / 2 + (cy - (y1 + y2) / 2) * 0.35;
+    const t = 0.27, bx = (1 - t) ** 2 * x1 + 2 * (1 - t) * t * qx + t * t * x2, by = (1 - t) ** 2 * y1 + 2 * (1 - t) * t * qy + t * t * y2;
+    return `<path d="M${x1},${y1} Q${qx},${qy} ${x2},${y2}" class="fm-cross" marker-end="url(#fm-ar2)"/><text x="${bx}" y="${by - 5}" class="fm-cl">${esc(l)}</text>`; }).join('');
+  const nodes = fmNodes(f, sid, sel, pos, nw, nh, print);
+  const s = f.s;
+  const center = `<g class="fm-center"><circle cx="${cx}" cy="${cy}" r="78" class="fm-cbg"/><circle cx="${cx}" cy="${cy - 28}" r="15" class="fm-cfg"/><path d="M${cx - 26},${cy + 12} c4,-16 14,-22 26,-22 s22,6 26,22" class="fm-cfg"/>
+    <text x="${cx}" y="${cy + 34}" class="fm-ct">${esc(s?.alias || '')}</text><text x="${cx}" y="${cy + 52}" class="fm-cs">${esc(s?.grade || '')} · IEP 순환</text></g>`;
+  return `<svg class="fm" viewBox="0 0 ${W} ${H}" role="group" aria-label="IEP 전체 흐름 도식: 학생을 가운데 두고 일곱 영역이 고리로 이어지며, 점선은 영역끼리 주고받는 자료">
+    <defs><marker id="fm-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fm-arh"/></marker>
+    <marker id="fm-ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fm-arh2"/></marker></defs>
+    <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" class="fm-ring"/>${center}${cross}${flow}${nodes}</svg>`;
+}
+
+
+// 휴대폰용 세로 그림: 같은 일곱 영역을 위에서 아래로, 마지막 영역에서 처음으로 돌아가는 화살표는 왼쪽, 서로 주고받는 자료는 오른쪽 곡선
+export function flowMapV(f, sid, sel = '') {
+  const W = 440, nw = 210, nh = 104, x0 = 205, top = 130, gap = 150, H = top + gap * (STEPS.length - 1) + nh / 2 + 30;
+  const pos = {}; STEPS.forEach(([k], i) => { pos[k] = [x0, top + i * gap]; });
+  const idx = Object.fromEntries(STEPS.map(([k], i) => [k, i]));
+  const flow = LINKS.map(([a, b, l]) => {
+    const [xa, ya] = pos[a], [xb, yb] = pos[b];
+    if (idx[b] === idx[a] + 1) return `<line x1="${xa}" y1="${ya + nh / 2 + 4}" x2="${xb}" y2="${yb - nh / 2 - 6}" class="fm-flow" marker-end="url(#fmv-ar)"/><text x="${xa + 10}" y="${(ya + yb) / 2 + 4}" class="fm-ll" style="text-anchor:start">${esc(l)}</text>`;
+    const lx = xa - nw / 2 - 6;
+    return `<path d="M${lx},${ya} C${18},${ya} ${18},${yb} ${lx},${yb}" class="fm-flow" fill="none" marker-end="url(#fmv-ar)"/><text x="16" y="${(ya + yb) / 2}" class="fm-ll" transform="rotate(-90 16 ${(ya + yb) / 2})">${esc(l)}</text>`;
+  }).join('');
+  const cross = CROSS.map(([a, b, l], j) => { const [xa, ya] = pos[a], [xb, yb] = pos[b]; const rx = xa + nw / 2 + 6, bx = rx + 40 + j * 22;
+    return `<path d="M${rx},${ya + 10} C${bx},${ya + 10} ${bx},${yb - 10} ${rx},${yb - 10}" class="fm-cross" marker-end="url(#fmv-ar2)"/><text x="${bx - 6}" y="${(ya + yb) / 2}" class="fm-cl" transform="rotate(90 ${bx - 6} ${(ya + yb) / 2})">${esc(l)}</text>`; }).join('');
+  const s = f.s;
+  const head = `<g class="fm-center"><rect x="${x0 - nw / 2}" y="8" width="${nw}" height="60" rx="30" class="fm-cbg"/><circle cx="${x0 - nw / 2 + 30}" cy="31" r="10" class="fm-cfg"/><path d="M${x0 - nw / 2 + 14},58 c3,-11 9,-15 16,-15 s13,4 16,15" class="fm-cfg"/>
+    <text x="${x0 + 18}" y="35" class="fm-ct">${esc(s?.alias || '')}</text><text x="${x0 + 18}" y="54" class="fm-cs">${esc(s?.grade || '')} · IEP 순환</text></g>
+    <line x1="${x0}" y1="70" x2="${x0}" y2="${top - nh / 2 - 6}" class="fm-flow" marker-end="url(#fmv-ar)"/>`;
+  return `<svg class="fm fm-v" viewBox="0 0 ${W} ${H}" role="group" aria-label="IEP 전체 흐름 도식(세로)">
+    <defs><marker id="fmv-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fm-arh"/></marker>
+    <marker id="fmv-ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="fm-arh2"/></marker></defs>
+    ${head}${cross}${flow}${fmNodes(f, sid, sel, pos, nw, nh, false)}</svg>`;
+}
+const selBy = {};
 export function flowHtml(sid, print = false) {
   const f = collectFlow(sid);
-  return `<div class="fl ${print ? 'fl-print' : ''}">
-    ${print ? `<h2 class="tr-title">IEP 전체 흐름 — ${esc(f.s?.alias || '')}</h2><p class="small">작성 ${esc(todayStr())} · 가상 학생 시연 자료</p>` : ''}
-    <ol class="fl-steps" aria-label="IEP 단계">${STEPS.map(([k, l, d], i) => `<li class="fl-st ${f.status[k]}"><button type="button" class="fl-go" data-act="fl-go" data-k="${k}"><span class="fl-n">${i + 1}</span><span><b>${l}</b><small>${d}</small></span><span class="fl-dot" title="${ST_LABEL[f.status[k]]}" aria-label="${ST_LABEL[f.status[k]]}"></span></button></li>`).join('')}</ol>
-    ${STEPS.map(([k, l, d], i) => `<section class="card fl-sec" id="fl-${k}"><div class="goal-head"><h3 class="h3"><span class="fl-n">${i + 1}</span> ${l} <small class="muted">${d}</small></h3><span class="grow"></span><span class="tag ${f.status[k] === 'ok' ? 'ok' : f.status[k] === 'part' ? 'warn' : ''}">${ST_LABEL[f.status[k]]}</span></div>${stepBody(k, f, sid, print)}</section>`).join('')}
-  </div>`;
+  const sel = selBy[sid] || '';
+  const legend = `<p class="tiny muted fm-legend"><span class="fm-k ok"></span>자료 있음 <span class="fm-k part"></span>진행 중 <span class="fm-k empty"></span>비어 있음 · 실선 화살표 = IEP 순서 · 점선 = 영역끼리 주고받는 자료</p>`;
+  if (print) return `<div class="fl fl-print"><h2 class="tr-title">IEP 전체 흐름 — ${esc(f.s?.alias || '')}</h2><p class="small">작성 ${esc(todayStr())} · 가상 학생 시연 자료</p>
+    ${flowMap(f, sid, '', true)}${legend}
+    ${STEPS.map(([k, l, d], i) => `<section class="card fl-sec"><h3 class="h3"><span class="fl-n">${i + 1}</span> ${l} <small class="muted">${d}</small></h3>${stepBody(k, f, sid, true)}</section>`).join('')}</div>`;
+  const i = STEPS.findIndex(([k]) => k === sel);
+  const detail = i < 0 ? '<section class="card fm-detail fm-hint"><p class="small">위 그림에서 영역을 누르면 그 영역에 쌓인 내용이 여기에 펼쳐집니다. 영역 아래 작은 글씨(예: 기능평가 ›)를 누르면 그 기록 화면으로 바로 갑니다.</p></section>'
+    : `<section class="card fm-detail" id="fl-${sel}" tabindex="-1"><div class="goal-head"><h3 class="h3"><span class="fl-n">${i + 1}</span> ${STEPS[i][1]} <small class="muted">${STEPS[i][2]}</small></h3><span class="grow"></span>
+      <span class="tag ${f.status[sel] === 'ok' ? 'ok' : f.status[sel] === 'part' ? 'warn' : ''}">${ST_LABEL[f.status[sel]]}</span>
+      ${i > 0 ? `<button type="button" class="ghost sm" data-act="fl-node" data-sid="${sid}" data-k="${STEPS[i - 1][0]}">‹ 앞 영역</button>` : ''}${i < STEPS.length - 1 ? `<button type="button" class="ghost sm" data-act="fl-node" data-sid="${sid}" data-k="${STEPS[i + 1][0]}">다음 영역 ›</button>` : ''}
+      <button type="button" class="ghost sm" data-act="fl-node" data-sid="${sid}" data-k="">닫기</button></div>${stepBody(sel, f, sid, false)}</section>`;
+  return `<div class="fl"><section class="card fm-wrap"><div class="fm-h">${flowMap(f, sid, sel)}</div><div class="fm-vw">${flowMapV(f, sid, sel)}</div>${legend}</section>${detail}</div>`;
 }
 
 export function flowTab(s) {
   const sid = s.id;
   useSub('ev:' + sid, 'bevents', { sid }, (r) => { S.eventsBy[sid] = r; });
   useSub('memo:' + sid, 'memos', { sid }, (r) => { S.memosBy[sid] = r.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)); });
-  return `<div class="bar"><span class="small muted">학생 이해에서 학기말 평가까지 IEP를 한 흐름으로 봅니다. 단계 이름을 누르면 그 칸으로 갑니다.</span><span class="grow"></span>
-    <button type="button" class="ghost" data-act="vis-pick" data-sid="${sid}">시각자료 고르기</button><button type="button" class="primary" data-act="fl-print" data-sid="${sid}">전체 인쇄</button></div>
+  return `<div class="bar"><span class="small muted">학생의 IEP가 영역마다 어떻게 이어지는지 한 장의 그림으로 봅니다.</span><span class="grow"></span>
+    <button type="button" class="primary" data-act="fl-print" data-sid="${sid}">전체 인쇄</button></div>
     ${flowHtml(sid)}`;
 }
 
-on('fl-go', (el) => { const t = document.getElementById('fl-' + el.dataset.k); if (t) { t.scrollIntoView({ behavior: 'smooth', block: 'start' }); t.setAttribute('tabindex', '-1'); t.focus({ preventScroll: true }); } });
+on('fl-node', (el) => {
+  const { sid, k } = el.dataset; selBy[sid] = selBy[sid] === k && el.closest('svg') ? '' : k; rerender();
+  if (selBy[sid]) setTimeout(() => { const d = document.querySelector('.fm-detail'); d?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }, 30);
+});
+// 그림 속 영역도 키보드(Enter·Space)로 누를 수 있게
+document.addEventListener('keydown', (e) => { const g = e.target.closest?.('g[data-act="fl-node"]'); if (g && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); g.dispatchEvent(new MouseEvent('click', { bubbles: true })); } });
 on('fl-print', (el) => {
   let root = document.getElementById('print-root');
   if (!root) { root = document.createElement('div'); root.id = 'print-root'; document.body.appendChild(root); }
