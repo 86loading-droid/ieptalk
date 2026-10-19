@@ -59,7 +59,7 @@ function shell(content) {
   return `
   <a class="skip" href="#main">본문 바로가기</a>
   <header class="topbar">
-    <div class="brand"><span class="logo" aria-hidden="true">톡</span><span>${APP_NAME}</span>${S.store.mode === 'demo' ? '<span class="pill">데모</span>' : ''}</div>
+    <div class="brand"><span class="logo" aria-hidden="true">톡</span><span>${APP_NAME}</span><span class="pill demo-pill" title="실제 학생 정보는 넣지 않습니다">${S.store.mode === 'demo' ? '<span class="pill-x">데모 · </span>' : ''}가상 학생 전용<span class="pill-x"> 시연판</span></span></div>
     <div class="me">
       <button type="button" class="ghost sm help-btn" data-act="guide-open" aria-label="도움말"><span class="lbl">도움말</span></button>
       ${avatar(S.me.uid)}<span class="me-name">${esc(S.me.name)}<small>${esc(S.me.title || ROLE_LABEL[S.me.role])}</small></span>

@@ -123,12 +123,16 @@ export function behaviorChart(target, series, marks = []) {
   const st = baselineStats(series);
   const lastA = firstB > 0 ? firstB - 1 : n - 1;
   const meanLine = st.n ? `<line x1="${X(0)}" x2="${X(lastA)}" y1="${Y(st.mean)}" y2="${Y(st.mean)}" class="mean"/>` : '';
+  // 중재(B) 평균선: 수준 변화를 눈으로 비교
+  const bv = firstB >= 0 ? series.slice(firstB).map((p) => p.v) : [];
+  const bMean = bv.length ? round1(mean(bv)) : null;
+  const bMeanLine = bv.length ? `<line x1="${X(firstB)}" x2="${X(n - 1)}" y1="${Y(bMean)}" y2="${Y(bMean)}" class="mean b-mean"/>` : '';
   const ticks = series.map((p, i) => (n <= 10 || i % Math.ceil(n / 8) === 0 ? `<text x="${X(i)}" y="${H - 12}" text-anchor="middle" class="tick">${esc(fmtDate(p.d).replace(/\(.\)/, ''))}</text>` : '')).join('');
   const markSet = new Set(marks);
   const stars = series.map((p, i) => (markSet.has(p.d) ? `<text x="${X(i)}" y="${Y(p.v) - 10}" text-anchor="middle" class="crisis-mark">★<title>${esc(fmtDate(p.d))} 위기행동 사후 기록</title></text>` : '')).join('');
-  const summary = `${target.name} ${unit}. 기초선 ${st.n}회기, 평균 ${st.mean ?? 0}.${marks.length ? ` 위기행동 ${marks.length}건 표시.` : ''}`;
-  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(summary)}">${axes(ymax, unit)}<text x="${L + 4}" y="${T + 12}" class="tick">기초선(A)</text>${meanLine}${segs}${dots}${stars}${phaseLine}${ticks}</svg>
-  <figcaption><span class="lg dot-lg"></span>기초선 <span class="lg b-lg"></span>중재 <span class="lg mean-lg"></span>기초선 평균${marks.length ? ' <span class="crisis-mark" aria-hidden="true">★</span> 위기행동 사후 기록' : ''}</figcaption></figure>`;
+  const summary = `${target.name} ${unit}. 기초선 ${st.n}회기, 평균 ${st.mean ?? 0}.${bMean != null ? ` 중재 ${bv.length}회기, 평균 ${bMean}.` : ''}${marks.length ? ` 위기행동 ${marks.length}건 표시.` : ''}`;
+  return `<figure class="chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(summary)}">${axes(ymax, unit)}<text x="${L + 4}" y="${T + 12}" class="tick">기초선(A)</text>${meanLine}${bMeanLine}${segs}${dots}${stars}${phaseLine}${ticks}</svg>
+  <figcaption><span class="lg dot-lg"></span>기초선 <span class="lg b-lg"></span>중재 <span class="lg mean-lg"></span>기초선 평균${bMean != null ? ' <span class="lg bmean-lg"></span>중재 평균' : ''}${marks.length ? ' <span class="crisis-mark" aria-hidden="true">★</span> 위기행동 사후 기록' : ''}</figcaption></figure>`;
 }
 
 export const parseD = parseDate;

@@ -206,13 +206,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 6) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 7) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 6, school: defaultSchool(), c: {} };
+    const d = { v: 7, school: defaultSchool(), c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));
@@ -230,6 +230,14 @@ function makeDemoStore() {
      [2, '08:40', 0, '', '등교', ['건강·컨디션', '보호자 연락'], '보호자 알림장: 어젯밤 늦게 잠듦. 1교시 중 하품 여러 차례.', false],
      [4, '13:10', 5, '체육', '수업 중', ['잘한 점·성장', 'IEP 목표 관련'], '줄 서기에서 차례를 끝까지 기다림(약 3분). IEP 목표 「차례 기다리기」 관련.', true]
     ].forEach(([k, time, period, subj, sit, tags, text, star], i) => put(pathOf('memos', { sid: 's1' }), { id: `nt${i + 1}`, kind: 'note', date: nd(k), time, period, subj, sit, tags, text, star, title: '', blocks: [], createdBy: i % 2 ? 'u-t2' : 'u-admin', updatedBy: i % 2 ? 'u-t2' : 'u-admin', createdAt: now - k * 864e5, updatedAt: now - k * 864e5 }));
+    // 기능평가 예시(하람, 소리 지르기): 동기평가 2명, ABC 서술 기록 3건, 의사소통기능평가 1건
+    const fm = (o) => put(pathOf('memos', { sid: 's1' }), { title: '', blocks: [], createdAt: now, updatedAt: now, ...o });
+    fm({ id: 'fa1', kind: 'mas', tid: 'b1', date: nd(3), setting: '국어·수학 시간', ans: [1, 4, 2, 1, 0, 3, 1, 1, 1, 3, 2, 2, 0, 3, 1, 1], createdBy: 'u-admin', updatedBy: 'u-admin' });
+    fm({ id: 'fa2', kind: 'mas', tid: 'b1', date: nd(2), setting: '통합학급 수업', ans: [1, 3, 2, 2, 1, 3, 2, 1, 1, 4, 1, 2, 0, 2, 2, 1], createdBy: 'u-t2', updatedBy: 'u-t2' });
+    fm({ id: 'fa3', kind: 'abc', tid: 'b1', date: nd(2), time: '10:12', setting: '수학, 특수학급', a: '과제 제시', aText: '덧셈 학습지 1장 제시', b: '「아아」 하고 큰 소리를 약 5초 냄, 학습지를 밀어냄', c: '과제 중단·회피', cText: '교사가 학습지를 치우고 쉬는 자리로 안내', fn: 'esc', createdBy: 'u-admin', updatedBy: 'u-admin' });
+    fm({ id: 'fa4', kind: 'abc', tid: 'b1', date: nd(1), time: '09:20', setting: '국어, 통합학급', a: '과제 제시', aText: '받아쓰기 시작 안내', b: '큰 소리 3회, 책상에 엎드림', c: '교사 관심', cText: '담임이 다가와 「괜찮아?」라고 말함', fn: 'att', createdBy: 'u-t2', updatedBy: 'u-t2' });
+    fm({ id: 'fa5', kind: 'abc', tid: 'b1', date: nd(0), time: '10:40', setting: '수학, 특수학급', a: '활동 전환', aText: '블록 놀이 끝내고 학습지로 전환', b: '큰 소리 2회(각 3초쯤)', c: '과제 쉬움으로 바꿈', cText: '학습지를 반으로 줄여 줌', fn: 'esc', createdBy: 'u-admin', updatedBy: 'u-admin' });
+    fm({ id: 'fa6', kind: 'comm', date: nd(1), grid: { obj: ['ges', 'aac'], act: ['ges'], help: ['none'], brk: ['pb'], no: ['pb', 'ges'], call: ['voc'], greet: ['ges'], yn: ['ges'], tell: ['none'], feel: ['pb'] }, note: '그림카드 20장 사용, 「주세요」 카드는 스스로 냄', createdBy: 'u-admin', updatedBy: 'u-admin' });
     put(pathOf('rooms'), { id: 'r-s1', type: 'student', studentId: 's1', name: '하람(가명) IEP팀', memberUids: ['u-admin', 'u-t2'], lastAt: now - 3600e3, lastBy: 'u-t2', lastText: '오늘 국어 시간에 카드 교환이 두 번 있었어요.', readBy: { 'u-admin': now - 7200e3, 'u-t2': now } });
     put(pathOf('messages', { rid: 'r-s1' }), { id: 'm1', by: 'u-admin', at: now - 7300e3, kind: 'text', text: '하람이 소리 지르기 기초선 6회기째입니다. 이번 주 안에 중재 시작을 논의하면 좋겠습니다.' });
     put(pathOf('messages', { rid: 'r-s1' }), { id: 'm2', by: 'u-t2', at: now - 3600e3, kind: 'text', text: '오늘 국어 시간에 카드 교환이 두 번 있었어요.' });
