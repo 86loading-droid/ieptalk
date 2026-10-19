@@ -8,6 +8,8 @@ import { fbaTab } from './fba.js';
 import { solutionPanel } from './solution.js';
 import { openIepGen } from './iepgen.js';
 import { termTab } from './termreport.js';
+import { flowTab } from './iepflow.js';
+import './visuals.js';
 import { accomTab, accomsOf, needsMyConfirm } from './accoms.js';
 import { logAccess } from '../access.js';
 import { recordCard, eventRow, confirmInline, ANTECEDENTS, CONSEQUENCES } from './record.js';
@@ -49,9 +51,9 @@ function detail(sid, tab, args = []) {
   const s = student(sid);
   if (!s) return '<section class="card"><p>학생을 찾을 수 없습니다.</p><a href="#/students">목록으로</a></section>';
   const nAcc = accomsOf(sid).filter(needsMyConfirm).length;
-  const tabs = [['goals', 'IEP 목표·진전도'], ['note', '관찰 메모'], ['behavior', '행동·기초선'], ['fba', '기능평가'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모'], ['term', '학기말 종합']];
+  const tabs = [['flow', 'IEP 전체 흐름'], ['goals', 'IEP 목표·진전도'], ['note', '관찰 메모'], ['behavior', '행동·기초선'], ['fba', '기능평가'], ['crisis', '위기행동 사후 기록'], ['accom', `평가조정${nAcc ? ` <span class="badge">${nAcc}</span>` : ''}`], ['memo', '공유 메모'], ['term', '학기말 종합']];
   logAccess(sid, 'view', tab === 'goals' ? 'goals_tab' : tab);
-  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'note' ? notesTab(s) : tab === 'fba' ? fbaTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : tab === 'term' ? termTab(s) : goalsTab(s);
+  const body = tab === 'behavior' ? behaviorTab(s) : tab === 'note' ? notesTab(s) : tab === 'fba' ? fbaTab(s) : tab === 'memo' ? memoTab(s) : tab === 'crisis' ? crisisTab(s, args) : tab === 'accom' ? accomTab(s) : tab === 'term' ? termTab(s) : tab === 'flow' ? flowTab(s) : goalsTab(s);
   return `<a class="back" href="#/students">‹ 학생 목록</a>
   <div class="page-head"><h1>${esc(s.alias)} <small class="muted">${esc(s.grade || '')}</small></h1>
     <div class="btns"><button type="button" class="ghost" data-act="stu-room" data-sid="${sid}">팀 대화방</button>
