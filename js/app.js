@@ -14,6 +14,7 @@ import { alertsBar } from './views/alerts.js';
 import './views/acadImport.js';
 import './views/observe.js';
 import { maybeShowGuide } from './views/guide.js';
+import { prepareTour, renderTour } from './views/tour.js';
 import { netBanner } from './net.js';
 import { installAccessLog } from './access.js';
 
@@ -110,7 +111,7 @@ document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-change]');
   if (el && actions[el.dataset.change]) Promise.resolve(actions[el.dataset.change](el, e)).catch((err) => toast('처리하지 못했습니다: ' + err.message));
 });
-window.addEventListener('hashchange', () => { closeModal(); rerender(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { closeModal(); rerender(); renderTour(); window.scrollTo(0, 0); });
 
 on('signout', () => S.store.signOut());
 
@@ -170,11 +171,12 @@ function loginScreen(status, err) {
       <p class="lead">현장 특수교사의 IEP 작성·진전도·행동 기록과 교사 간 협업을 한곳에서.</p>
       ${msg ? `<p class="alert" role="alert">${esc(msg)}</p>` : ''}
       ${demo ? `<h2 class="h3">데모 사용자 선택</h2><p class="muted">가상 학생 자료로 움직이는 시연판입니다. 다른 창(탭)에서 다른 사용자를 고르면 메신저·예약이 실시간으로 오갑니다.</p><div class="user-list">${demoUsers}</div>
+        <p class="small"><a href="?demo=1&tour=1">안내를 따라 둘러보기</a></p>
         <button type="button" class="ghost sm" data-act="demo-reset">데모 자료 처음으로</button>`
       : `<button type="button" class="primary block" data-act="google-login"><svg viewBox="0 0 24 24" aria-hidden="true" class="g"><path d="M21.6 12.2c0-.7-.1-1.4-.2-2H12v3.8h5.4a4.6 4.6 0 01-2 3v2.5h3.2c1.9-1.7 3-4.3 3-7.3z" fill="#4285F4"/><path d="M12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 1-3.4 1-2.6 0-4.8-1.8-5.6-4.1H3.1v2.6A10 10 0 0012 22z" fill="#34A853"/><path d="M6.4 14c-.2-.6-.3-1.3-.3-2s.1-1.4.3-2V7.4H3.1a10 10 0 000 9.2z" fill="#FBBC05"/><path d="M12 5.9c1.5 0 2.8.5 3.8 1.5l2.8-2.8A10 10 0 003.1 7.4L6.4 10C7.2 7.7 9.4 5.9 12 5.9z" fill="#EA4335"/></svg>구글 계정으로 로그인</button>
         ${status === 'noInvite' || status === 'inactive' ? '<button type="button" class="ghost block" data-act="signout">다른 계정으로 로그인</button>' : ''}
         <p class="muted small">초대받은 교사·보조인력만 들어올 수 있습니다. 실제 학생 정보는 넣지 마세요(시연판).</p>
-        <p class="small"><a href="?demo=1">로그인 없이 둘러보기(가상 자료, 이 브라우저 안에서만)</a></p>`}
+        <p class="small"><a href="?demo=1&tour=1">로그인 없이 안내 따라 둘러보기</a> · <a href="?demo=1">직접 둘러보기</a>(가상 자료, 이 브라우저 안에서만)</p>`}
     </div>
   </main>`;
 }
@@ -184,6 +186,7 @@ on('demo-login', (el) => { S.store.demoLogin(el.dataset.uid); location.hash = ''
 on('demo-reset', () => { S.store.resetDemo(); toast('데모 자료를 처음 상태로 되돌렸습니다.'); });
 
 async function boot() {
+  prepareTour();
   S.store = await makeStore();
   installAccessLog(S.store);
   let started = false;
@@ -193,6 +196,7 @@ async function boot() {
     if (!started) { started = true; startGlobal(); }
     render();
     maybeShowGuide();
+    renderTour();
   });
   if (isDemo()) document.documentElement.dataset.demo = '1';
 }
