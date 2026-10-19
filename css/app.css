@@ -810,3 +810,35 @@ button.notice-btn:hover { border-color: var(--danger); }
 #print-root table.pf { width: 100%; border-collapse: collapse; font-size: 10pt; }
 #print-root table.pf th, #print-root table.pf td { border: 1px solid #999; padding: 4pt; vertical-align: top; }
 #print-root table.pf.abc td { height: 34pt; }
+/* v21: IEP 생성기(교과·성취기준) */
+.ig-mode button { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; padding: .6rem .9rem; color: var(--muted); min-height: 44px; white-space: nowrap; }
+.ig-mode button.on { color: var(--primary); border-color: var(--primary); font-weight: 700; }
+.ig-pick select, .ig-pick input:not([type=number]) { width: 100%; max-width: 100%; }
+.ig-pick select { min-height: 44px; }
+.ig-pick optgroup { font-weight: 700; }
+.ig-sugg { align-items: center; margin-bottom: .35rem; }
+.ig-std { border: 1px solid var(--line); border-radius: 10px; padding: .7rem .9rem; margin-bottom: .7rem; background: var(--surface); word-break: keep-all; }
+.ig-std ul { margin: .3rem 0; padding-left: 1.1rem; }
+.ig-std li { margin: .25rem 0; line-height: 1.6; }
+.ig-sev { border-left: 4px solid var(--sun, #F2C14E); background: var(--warn-soft, #FFF7E0); padding: .4rem .7rem; border-radius: 6px; margin: .5rem 0; }
+.ig-out .ig-doc { max-height: 52dvh; }
+/* v21: 학기말 종합 */
+.tr-bar { flex-wrap: wrap; align-items: center; }
+.tr-bar label input { margin-left: .25rem; }
+.tr-edit textarea { width: 100%; }
+.tr-fields { display: grid; gap: .6rem; }
+.tr-chk { white-space: nowrap; margin-right: .6rem; display: inline-flex; align-items: center; gap: .2rem; min-height: 32px; }
+.tr-doc { word-break: keep-all; }
+.tr-doc .tr-title { font-size: 1.15rem; margin: 0 0 .2rem; }
+.tr-sec { margin-top: .9rem; }
+.tr-sec h3 { font-size: .98rem; margin: 0 0 .35rem; border-bottom: 1px solid var(--line); padding-bottom: .2rem; }
+.tr-doc .pre { white-space: pre-wrap; }
+.tr-t { width: 100%; border-collapse: collapse; font-size: .85rem; display: block; overflow-x: auto; }
+.tr-t th, .tr-t td { border: 1px solid var(--line); padding: .3rem .4rem; vertical-align: top; text-align: left; }
+.tr-t th { background: var(--surface); white-space: nowrap; }
+.tr-b { margin-bottom: .5rem; } .tr-b ul { margin: .2rem 0; padding-left: 1.1rem; }
+@media print {
+  #print-root .tr-doc { font-size: 10pt; }
+  #print-root .tr-t { display: table; font-size: 9pt; } #print-root .tr-t th, #print-root .tr-t td { border: 1px solid #999; }
+  #print-root .tr-sec { break-inside: avoid-page; } #print-root .tr-sec h3 { border-bottom: 1px solid #999; }
+}
