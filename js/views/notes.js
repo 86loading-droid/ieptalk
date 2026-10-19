@@ -91,6 +91,7 @@ export function notesTab(s) {
     <div class="nt-row"><span class="nt-k">상황</span>${chipRow(sid, 'sit', d.sit)}</div>
     <div class="nt-row"><span class="nt-k">종류</span>${chipRow(sid, 'tag', d.tags, true)}</div>
     <textarea class="nt-input" id="nt-text-${sid}" rows="3" data-nt-text="${sid}" placeholder="보고 들은 그대로 짧게. 예: 받아쓰기 10문항 중 7문항 바르게 씀, 3번째 문항부터 「도와주세요」 카드를 스스로 냄 (Ctrl+Enter로 저장)">${esc(d.text)}</textarea>
+    ${d.tags.includes('건강·컨디션') ? '<p class="small nt-warn" role="note">건강·컨디션 메모에는 진단명·약 이름을 적지 않습니다. 보이는 상태만 적습니다(예: 오전에 하품 여러 차례, 「배 아파요」라고 말함).</p>' : ''}
     <div class="bar"><label class="chk"><input type="checkbox" data-change="nt-draft" data-sid="${sid}" data-k="star" ${d.star ? 'checked' : ''}> ★ 중요(IEP 평가·상담 때 다시 볼 것)</label><span class="grow"></span>
       <button type="button" class="ghost sm" data-act="nt-clear" data-sid="${sid}">비우기</button><button type="button" class="primary" data-act="nt-save" data-sid="${sid}">기록</button></div>
     <p class="tiny muted">교과는 날짜·시각에 맞는 내 시간표 칸(한눈에 → 주간 시간표)으로 자동 선택됩니다. 진단명·다른 학생 이름은 적지 않습니다.</p>
