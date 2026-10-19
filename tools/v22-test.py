@@ -20,6 +20,8 @@ async def main():
       chk(await pg.locator('.modal-back').count() == 0, 'no first guide modal')
       chk('둘러보기 1 /' in await pg.inner_text('#tour-bar'), 'tour step 1')
       await pg.click('#tour-bar [data-tour="1"]'); await pg.wait_for_timeout(500)
+      chk('#/student/s1/now' in pg.url and '지금 현황' in await pg.inner_text('#tour-bar'), 'tour → now')
+      await pg.click('#tour-bar [data-tour="2"]'); await pg.wait_for_timeout(500)
       chk('#/student/s1/flow' in pg.url and 'IEP 전체 흐름' in await pg.inner_text('#tour-bar'), 'tour → flow')
       # ---- IEP 전체 흐름 ----
       t = await pg.inner_text('#main')
@@ -28,9 +30,9 @@ async def main():
       chk(await pg.locator('.fl-st.ok').count() >= 4, 'statuses')
       chk('소리 지르기' in t and '기능 가설' in t, 'behavior in flow')
       chk(await pg.locator('.fl-spark').count() >= 1, 'sparkline')
-      await pg.click('#tour-bar [data-tour="2"]'); await pg.wait_for_timeout(1200)
+      await pg.click('#tour-bar [data-tour="3"]'); await pg.wait_for_timeout(1200)
       chk(await pg.locator('.ig').count() == 1, 'tour opens iep generator')
-      for k in ['3', '4', '5']: await pg.click(f'#tour-bar [data-tour="{k}"]'); await pg.wait_for_timeout(500)
+      for k in ['4', '5', '6']: await pg.click(f'#tour-bar [data-tour="{k}"]'); await pg.wait_for_timeout(500)
       await pg.wait_for_timeout(900)
       chk(await pg.locator('.vis-modal').count() == 1, 'tour opens visual picker')
       # ---- 시각자료 고르기 ----
@@ -58,7 +60,7 @@ async def main():
       chk(ow <= 1, f'no hscroll flow {ow}')
       await pg.screenshot(path=f'{OUT}/v22_flow_{vw[0]}.png', full_page=True)
       # 마지막 단계·끝내기
-      for k in ['6', '7', '8', '9']: await pg.click(f'#tour-bar [data-tour="{k}"]'); await pg.wait_for_timeout(400)
+      for k in ['7', '8', '9', '10']: await pg.click(f'#tour-bar [data-tour="{k}"]'); await pg.wait_for_timeout(400)
       chk('#/chat' in pg.url and '마치기' in await pg.inner_text('#tour-bar'), 'last step')
       await pg.click('#tour-bar [data-tour="end"]'); await pg.wait_for_timeout(200)
       chk(await pg.locator('#tour-bar').count() == 0, 'tour ended')
