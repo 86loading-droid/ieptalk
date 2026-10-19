@@ -947,3 +947,31 @@ textarea.ig-edit { display: block; width: 100%; min-height: 18rem; resize: verti
 .mo-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 @media (max-width: 600px) { .mo-scroll .mo-steps, .mo-scroll .mo-tl { min-width: 600px; } }
 .mo > *, .mo-grid > * { min-width: 0; }
+
+/* v24 IEP 전체 흐름 큰 그림 */
+.fm-wrap { padding: .6rem; }
+.fm { width: 100%; height: auto; display: block; max-height: 78vh; }
+.fm-ring { fill: none; stroke: var(--primary-soft); stroke-width: 26; }
+.fm-flow { stroke: var(--primary); stroke-width: 2.5; } .fm-arh { fill: var(--primary); }
+.fm-cross { fill: none; stroke: #8E5BC4; stroke-width: 1.8; stroke-dasharray: 6 4; } .fm-arh2 { fill: #8E5BC4; }
+.fm-ll { font-size: 12px; fill: var(--primary); font-weight: 600; text-anchor: middle; paint-order: stroke; stroke: var(--surface, #fff); stroke-width: 4px; }
+.fm-cl { font-size: 11.5px; fill: #6B3FA0; text-anchor: middle; paint-order: stroke; stroke: var(--surface, #fff); stroke-width: 4px; }
+.fm-cbg { fill: var(--primary-soft); stroke: var(--primary); stroke-width: 2; } .fm-cfg { fill: var(--primary); }
+.fm-ct { font-size: 16px; font-weight: 700; text-anchor: middle; fill: var(--text); } .fm-cs { font-size: 11.5px; text-anchor: middle; fill: var(--muted, #666); }
+.fm-node { cursor: pointer; outline: none; }
+.fm-box { fill: var(--surface, #fff); stroke: var(--line); stroke-width: 2; stroke-dasharray: 5 4; }
+.fm-node.ok .fm-box { stroke: var(--ok); stroke-dasharray: none; } .fm-node.part .fm-box { stroke: #D08A1E; stroke-dasharray: none; }
+.fm-node:hover .fm-box, .fm-node:focus-visible .fm-box { fill: var(--primary-soft); stroke-width: 3; }
+.fm-node.sel .fm-box { fill: var(--primary-soft); stroke: var(--primary); stroke-width: 4; stroke-dasharray: none; }
+.fm-num { fill: var(--line); } .fm-node.ok .fm-num { fill: var(--ok); } .fm-node.part .fm-num { fill: #D08A1E; }
+.fm-numt { font-size: 13px; font-weight: 700; text-anchor: middle; fill: #fff; }
+.fm-t { font-size: 16px; font-weight: 700; fill: var(--text); } .fm-f { font-size: 12.5px; fill: var(--text); }
+.fm-chip text { font-size: 12px; fill: var(--primary); text-decoration: underline; } .fm-chip:hover text { font-weight: 700; }
+.fm-legend { margin: .3rem .4rem 0; } .fm-k { display: inline-block; width: 12px; height: 12px; border-radius: 3px; border: 2px solid var(--line); vertical-align: middle; margin: 0 .2rem 0 .5rem; }
+.fm-k.ok { border-color: var(--ok); } .fm-k.part { border-color: #D08A1E; } .fm-k.empty { border-style: dashed; }
+.fm-detail { margin-top: .8rem; scroll-margin-top: 80px; } .fm-hint { background: var(--primary-soft); }
+.fl .fm-detail .goal-head { flex-wrap: wrap; gap: .4rem; }
+#print-root .fm { max-height: none; } #print-root .fm-wrap { border: 0; box-shadow: none; }
+.fm-cbg { fill-opacity: .92; }
+.fm-vw { display: none; }
+@media (max-width: 760px) { .fm-h { display: none; } .fm-vw { display: block; } .fm.fm-v { max-height: none; } }
