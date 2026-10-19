@@ -112,7 +112,8 @@ function profileCard(s) {
 }
 
 export function hypothesis(t, p, sm) {
-  const a = sm.a[0]?.[0], c = sm.c[0]?.[0];
+  // 뒤 결과는 결론 기능과 맞는 것을 먼저 쓴다(가장 많은 결과가 다른 기능이면 문장이 어긋나 보이므로)
+  const a = sm.a[0]?.[0], c = (sm.c.find(([k]) => C_FN[k] === p.top) || sm.c[0])?.[0];
   const fn = p.mixed ? `${FN[p.top]} 또는 ${FN[p.second]}` : FN[p.top];
   return `${a ? `「${a}」 상황에서` : '특정 상황에서'} ${t.name} 행동이 나타나고, ${c ? `그 뒤 「${c}」이(가) 따르는 일이 많아` : '그 뒤 결과를 더 관찰해야 하며'}, 행동의 기능은 ${fn}일 가능성이 높다.`;
 }
