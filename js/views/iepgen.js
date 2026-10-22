@@ -8,7 +8,7 @@ import { S, on, student } from '../state.js';
 import { COURSES, DISABILITIES, SUBJECTS, SUBJECT_GROUPS, LEVELS } from './iepdata.js';
 import { copyText } from './pireport.js';
 import { goalMissing } from './students.js';
-import { loadIndex, loadSubject, loadUnits, GRADES, bandOf, findStd, guidanceOf, suggestStds, sourceLine } from './curriculum.js';
+import { loadIndex, loadSubject, loadUnits, loadGuideIndex, loadGuide, guideKey, GRADES, bandOf, findStd, guidanceOf, suggestStds, sourceLine } from './curriculum.js';
 
 // 받침에 따라 을/를, 이/가
 const hasJong = (w) => { const c = String(w).trim().slice(-1).charCodeAt(0); return c >= 0xac00 && c <= 0xd7a3 && (c - 0xac00) % 28 !== 0; };
@@ -80,7 +80,7 @@ export const PARTS = [['indep', '독립 수행'], ['partial', '부분 참여(일
 export const RESP = [['speak', '말'], ['point', '가리키기·고르기'], ['aac', '그림카드·AAC'], ['sign', '몸짓·수어'], ['gaze', '눈 응시'], ['switch', '스위치·보조공학'], ['write', '쓰기']];
 const ro = (w) => { const c = String(w).trim().slice(-1).charCodeAt(0); if (!(c >= 0xac00 && c <= 0xd7a3)) return /[A-Za-z]$/.test(w) ? `${w}로` : `${w}(으)로`; const j = (c - 0xac00) % 28; return `${w}${j === 0 || j === 8 ? '로' : '으로'}`; };
 const noDot = (t) => String(t || '').trim().replace(/[.。]\s*$/, '');
-const lessonCore = (t) => noDot(String(t || '').replace(/^(도입 차시|\d+차시)\s*/, ''));
+const lessonCore = (t) => noDot(String(t || '').replace(/^(도입 차시|[\d~∼\-/]+차시)\s*/, '').replace(/\*+$/, ''));
 const SCENE_G = (g) => (g === '전공과' ? '실습 장면에서' : g?.startsWith('고') || g?.startsWith('중') ? '수업 중' : '수업 중');
 
 function gradeFromStudent(s) {
@@ -105,8 +105,9 @@ export function buildStdIep(st, ctx) {
   const respNames = st.resp.map((k) => (RESP.find(([v]) => v === k) || [])[1]).filter(Boolean);
   const resp = respNames.length ? respNames.join('이나 ') : '학생이 쓰는 반응 방식';
   const respRo = respNames.length ? resp.slice(0, resp.length - respNames[respNames.length - 1].length) + ro(respNames[respNames.length - 1]) : '학생이 쓰는 반응 방식으로';
-  const unit = st.unit && st.unit !== '__free' ? st.unit : st.unitFree;
-  const lesson = st.lesson && st.lesson !== '__free' ? st.lesson : st.lessonFree;
+  const { gu, gl } = ctx;
+  const unit = gu ? gu.u : st.unit && st.unit !== '__free' && !st.unit.startsWith('g:') ? st.unit : st.unitFree;
+  const lesson = gl ? gl.t : st.lesson && st.lesson !== '__free' && !st.lesson.startsWith('g:') ? st.lesson : st.lessonFree;
   const act = lessonCore(lesson) || (unit ? `${unit} 단원 활동` : `${subj.name} 수업 활동`);
   const scene = SCENE_G(st.grade);
   const stdLabel = isEl ? `「${std.t}」 내용 요소` : `[${std.c}] 「${noDot(std.t)}」`;
@@ -135,6 +136,8 @@ export function buildStdIep(st, ctx) {
     ],
     eval: `수행 관찰 체크리스트와 작품·기록(포트폴리오)으로 평가한다. 측정: 정반응률(%). 2주마다 진전도를 기록하고 3회 연속 목표선 아래면 교수 방법을 조정한다.${part !== 'indep' ? ' 부분 참여·대안 과제는 참여한 단계와 촉구 수준을 함께 적는다.' : ''}`,
     supports, sevPick,
+    guideUnit: gu ? { goals: gu.g, src: gu.src, codes: [...gu.m, ...gu.r] } : null,
+    guideLesson: gl ? { n: gl.n, p: gl.p, t: gl.t, c: gl.c } : null,
     udl: [
       `표상: ${subj.name} 내용을 실물·그림·영상·음성 등 여러 방식으로 제시`,
       `표현: ${resp} 등 학생이 할 수 있는 방식으로 답하게 함`,
@@ -149,6 +152,8 @@ export function stdIepText(o) {
   return [
     `IEP 초안 — ${o.title}`,
     o.stdLine,
+    o.guideUnit?.goals?.length ? `지도서 단원 목표(${o.guideUnit.src}):\n- ${o.guideUnit.goals.join('\n- ')}` : '',
+    o.guideLesson ? `이 차시(지도서): ${o.guideLesson.n ? `${o.guideLesson.n}차시 ` : ''}${o.guideLesson.t}${o.guideLesson.c?.length ? `\n- ${o.guideLesson.c.join('\n- ')}` : ''}` : '',
     `현행 수준: ${o.present}`,
     `차시 목표(수준별, ▶ 이 학생):\n${o.tiers.map(([k, l, t]) => ` ${k === o.part ? '▶' : '·'} ${l}: ${t}`).join('\n')}`,
     `장기 목표: ${o.long}`,
@@ -157,7 +162,7 @@ export function stdIepText(o) {
     o.supports.length ? `지원과 조정:\n- ${o.supports.join('\n- ')}` : '',
     o.sevPick.length ? `교육과정 원문의 중도중복장애·장애 정도가 심한 학생 지도(성취기준 적용 시 고려 사항):\n- ${o.sevPick.join('\n- ')}` : '',
     `보편적 학습설계(UDL):\n- ${o.udl.join('\n- ')}`,
-    '※ 성취기준·고려 사항은 2022 개정 특수교육 기본 교육과정 원문(국가교육위원회 고시 제2026-2호 일부개정 포함)에서 옮겼습니다. 목표 문장은 IEP 팀 협의용 초안입니다.'
+    `※ 성취기준·고려 사항은 2022 개정 특수교육 기본 교육과정 원문(국가교육위원회 고시 제2026-2호 일부개정 포함)에서${o.guideUnit ? ', 단원 목표·차시는 교사용 지도서에서' : ''} 옮겼습니다. 목표 문장은 IEP 팀 협의용 초안입니다.`
   ].filter(Boolean).join('\n\n');
 }
 
@@ -165,7 +170,7 @@ export function openIepGen(sid) {
   const s0 = student(sid);
   const st = { sid, mode: 'std', grade: gradeFromStudent(s0), subj: '', unit: '', unitFree: '', lesson: '', lessonFree: '', code: '', dis: [], level: '', part: '', resp: [], base: '', period: 'term',
     course: '', area: '', ed: {} };
-  const D = { idx: null, units: null, subj: {}, err: '' };
+  const D = { idx: null, units: null, subj: {}, err: '', gidx: null, guide: {} };
   let modal = null;
   const paint = () => {
     if (!modal) return;
@@ -174,7 +179,15 @@ export function openIepGen(sid) {
     modal.querySelectorAll('.ig-mode [data-mode]').forEach((b) => { const on = b.dataset.mode === st.mode; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
     if (key) { const el = modal.querySelector(`[data-igin="${key}"]`); if (el && el.tagName !== 'BUTTON') el.focus(); }
   };
-  Promise.all([loadIndex(), loadUnits()]).then(([i, u]) => { D.idx = i; D.units = u.units; paint(); }).catch(() => { D.err = '교육과정 자료를 불러오지 못했습니다. 새로 고침 뒤 다시 여세요.'; paint(); });
+  Promise.all([loadIndex(), loadUnits(), loadGuideIndex().catch(() => null)]).then(([i, u, g]) => { D.idx = i; D.units = u.units; D.gidx = g; paint(); }).catch(() => { D.err = '교육과정 자료를 불러오지 못했습니다. 새로 고침 뒤 다시 여세요.'; paint(); });
+  // 지도서 단원: 학년·교과에 맞는 파일을 처음 한 번 받아 둔다
+  const guideOf = () => {
+    const k = st.subj && st.grade ? guideKey(st.grade, st.subj, D.gidx) : '';
+    if (!k) return null;
+    const file = D.gidx.keys[k].file;
+    if (!D.guide[file]) { D.guide[file] = 'loading'; loadGuide(file).then((x) => { D.guide[file] = x; paint(); }).catch(() => { D.guide[file] = null; paint(); }); }
+    return D.guide[file] === 'loading' ? 'loading' : D.guide[file];
+  };
   const needSubj = (id) => { if (!id || D.subj[id]) return; D.subj[id] = 'loading'; loadSubject(id).then((x) => { D.subj[id] = x; paint(); }).catch(() => { D.subj[id] = null; D.err = '교과 자료를 불러오지 못했습니다.'; paint(); }); };
 
   const chips = (k, list, multi = false) => `<div class="nt-chips">${list.map(([v, l]) => { const on = multi ? st[k].includes(v) : st[k] === v; return `<button type="button" class="pr-chip sm ${on ? 'on' : ''}" aria-pressed="${on}" data-ig="${k}" data-v="${esc(v)}">${esc(l)}</button>`; }).join('')}</div>`;
@@ -183,7 +196,10 @@ export function openIepGen(sid) {
     const meta = D.idx?.subjects.find((x) => x.id === st.subj);
     const sd = D.subj[st.subj]; const subj = sd && sd !== 'loading' ? sd : null;
     const hit = subj && st.code ? findStd(subj, band, st.code) : null;
-    return { band, meta, subj, hit, guide: guidanceOf(hit) };
+    const G = guideOf(); const gd = G && G !== 'loading' ? G : null;
+    const gu = gd && st.unit?.startsWith('g:') ? gd.units[Number(st.unit.slice(2))] : null;
+    const gl = gu && st.lesson?.startsWith('g:') ? gu.s[Number(st.lesson.slice(2))] : null;
+    return { band, meta, subj, hit, guide: guidanceOf(hit), G, gd, gu, gl };
   };
 
   // 편집 가능한 초안: 모드마다 {base(마지막으로 만든 초안), text(교사가 고친 글), g(목표 카드 조건·행동·기준)}
@@ -212,17 +228,43 @@ export function openIepGen(sid) {
   }
   const missLine = (g) => { const m = goalMissing(g); return m.length ? `아직 빠진 요소: ${m.join(', ')}` : '조건·행동·기준이 모두 들어 있습니다.'; };
 
+  // 지도서 단원·차시 고르기 + 단원 목표·성취기준(주요/관련)·차시 학습 내용
+  function guideUnitUi(gd, gu, gl, has) {
+    const books = [...new Set(gd.units.map((u) => u.b || u.src))];
+    const opt = (u, i) => `<option value="g:${i}" ${st.unit === `g:${i}` ? 'selected' : ''}>${esc(u.u)}</option>`;
+    const unitSel = `<select data-igin="unit" aria-label="단원"><option value="">단원 고르기 (${gd.units.length}개)</option>${books.length > 1
+      ? books.map((b) => `<optgroup label="${esc(b)}">${gd.units.map((u, i) => ((u.b || u.src) === b ? opt(u, i) : '')).join('')}</optgroup>`).join('')
+      : gd.units.map(opt).join('')}<option value="__free" ${st.unit === '__free' ? 'selected' : ''}>직접 입력</option></select>`;
+    const codeChip = (cd, kind) => (has(cd) ? `<button type="button" class="pr-chip sm ${cd === st.code ? 'on' : ''}" data-ig="code" data-v="${esc(cd)}" title="${kind} 성취기준">${kind === '주요' ? '★ ' : ''}${esc(cd)}</button>`
+      : `<span class="pr-chip sm off" title="교육과정 원문(2026-2호)에 없는 코드: 지도서 표기 그대로">${esc(cd)}</span>`);
+    const parts = gu ? [...new Set(gu.s.map((l) => l.p))] : [];
+    const lopt = (l) => { const i = gu.s.indexOf(l); return `<option value="g:${i}" ${st.lesson === `g:${i}` ? 'selected' : ''}>${l.n ? `${esc(l.n)}${/^[\d~∼\-]+$/.test(l.n) ? '차시' : ''} · ` : ''}${esc(l.t)}</option>`; };
+    return `${unitSel}
+      ${st.unit === '__free' ? `<input data-igin="unitFree" value="${esc(st.unitFree)}" placeholder="예: 3. 우리 동네" aria-label="단원 직접 입력">` : ''}
+      ${gu ? `<div class="ig-unit">
+        ${gu.g.length ? `<details ${gu.g.length <= 3 ? 'open' : ''}><summary class="small">단원 목표 ${gu.g.length}개 · <small class="muted">${esc(gu.src)}</small></summary><ul class="small">${gu.g.map((x) => `<li>${esc(x)}</li>`).join('')}</ul></details>` : ''}
+        ${gu.m.length || gu.r.length ? `<p class="tiny muted ig-g">${gu.k === 'name' ? '단원명이 성취기준 문장에 그대로 나오는 성취기준(지도서 단원 쪽에는 코드 표기 없음)' : '지도서에 실린 이 단원의 성취기준 — 누르면 아래 성취기준이 바뀝니다'}</p>
+          <div class="nt-chips">${gu.m.map((cd) => codeChip(cd, '주요')).join('')}${gu.r.map((cd) => codeChip(cd, '관련')).join('')}</div>` : '<p class="tiny muted">이 단원은 지도서에 성취기준 코드가 따로 없습니다(일상생활 활동 등). 아래에서 고르세요.</p>'}
+      </div>` : ''}
+      <h3 class="ig-h">4. 차시·활동 ${gu ? `<small class="muted">${gu.s.length}개</small>` : ''}</h3>
+      ${gu ? `<select data-igin="lesson" aria-label="차시·활동"><option value="">차시·활동 고르기</option>${parts.length > 1 || parts[0]
+        ? parts.map((p) => `<optgroup label="${esc(p || '차시')}">${gu.s.filter((l) => l.p === p).map(lopt).join('')}</optgroup>`).join('') : gu.s.map(lopt).join('')}<option value="__free" ${st.lesson === '__free' ? 'selected' : ''}>직접 입력</option></select>
+        ${gl?.c?.length ? `<ul class="small ig-lc">${gl.c.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}` : ''}
+      ${!gu || st.lesson === '__free' ? `<input data-igin="lessonFree" value="${esc(st.lessonFree)}" placeholder="예: 5차시 우리 동네 가게 알아보기" aria-label="차시 직접 입력">` : ''}`;
+  }
+
   function stdBody() {
     if (D.err) return `<p class="alert">${esc(D.err)}</p>`;
     if (!D.idx) return '<p class="muted">교육과정 자료를 불러오는 중…</p>';
-    const c = ctxOf(); const { band, subj, hit, guide } = c;
+    const c = ctxOf(); const { band, subj, hit, guide, G, gd, gu, gl } = c;
     const subjects = st.grade ? D.idx.subjects.filter((x) => (x.groups[band] || 0) > 0) : [];
-    const uk = subj ? unitsKey(st.grade, subj.name, D.units) : '';
+    const uk = subj && !gd ? unitsKey(st.grade, subj.name, D.units) : '';
     const units = uk ? D.units[uk] : [];
     const unitObj = units.find((u) => u.u === st.unit);
-    const lessonText = st.lesson && st.lesson !== '__free' ? st.lesson : st.lessonFree;
-    const unitText = st.unit && st.unit !== '__free' ? st.unit : st.unitFree;
-    const sugg = subj ? suggestStds(subj, band, `${unitText || ''} ${lessonText || ''}`) : [];
+    const lessonText = gl ? gl.t : st.lesson && st.lesson !== '__free' ? st.lesson : st.lessonFree;
+    const unitText = gu ? gu.u : st.unit && st.unit !== '__free' ? st.unit : st.unitFree;
+    const sugg = subj && !gu ? suggestStds(subj, band, `${unitText || ''} ${lessonText || ''}`) : [];
+    const has = (code) => !!(subj && findStd(subj, band, code));
     const areas = subj?.groups?.[band] || [];
     const isEl = subj?.elements;
     const stdOpts = areas.map((a) => `<optgroup label="${esc(a.name || subj.name)}">${a.stds.map((x) => `<option value="${esc(x.c)}" ${x.c === st.code ? 'selected' : ''}>${isEl ? '' : `[${esc(x.c)}] `}${esc(x.t)}</option>`).join('')}</optgroup>`).join('');
@@ -231,13 +273,14 @@ export function openIepGen(sid) {
       <h3 class="ig-h">1. 학년 <small class="muted">${st.grade ? `성취기준 ${esc(band)} 학년군` : ''}</small></h3>${chips('grade', GRADES.map(([g]) => [g, g]))}
       ${st.grade ? `<h3 class="ig-h">2. 교과</h3>${chips('subj', subjects.map((x) => [x.id, x.name]))}` : ''}
       ${st.subj && !subj ? '<p class="muted small">교과 자료를 불러오는 중…</p>' : ''}
-      ${subj ? `<h3 class="ig-h">3. 단원</h3>
-        ${units.length ? `<select data-igin="unit" aria-label="단원"><option value="">단원 고르기</option>${units.map((u) => `<option ${u.u === st.unit ? 'selected' : ''}>${esc(u.u)}</option>`).join('')}<option value="__free" ${st.unit === '__free' ? 'selected' : ''}>직접 입력</option></select>`
-          : '<p class="tiny muted">이 학년·교과는 공개된 디지털 교과서 차례가 없어 학교 교과서를 보고 직접 적습니다.</p>'}
+      ${subj ? `<h3 class="ig-h">3. 단원 ${gd ? '<small class="muted">교사용 지도서</small>' : ''}</h3>
+        ${G === 'loading' ? '<p class="tiny muted">지도서 단원을 불러오는 중…</p>' : gd ? guideUnitUi(gd, gu, gl, has)
+        : `${units.length ? `<select data-igin="unit" aria-label="단원"><option value="">단원 고르기</option>${units.map((u) => `<option ${u.u === st.unit ? 'selected' : ''}>${esc(u.u)}</option>`).join('')}<option value="__free" ${st.unit === '__free' ? 'selected' : ''}>직접 입력</option></select>`
+          : '<p class="tiny muted">이 학년·교과는 아직 지도서 차례가 들어 있지 않아 학교 교과서를 보고 직접 적습니다.</p>'}
         ${!units.length || st.unit === '__free' ? `<input data-igin="unitFree" value="${esc(st.unitFree)}" placeholder="예: 3. 우리 동네" aria-label="단원 직접 입력">` : ''}
         <h3 class="ig-h">4. 차시·활동</h3>
         ${unitObj ? `<select data-igin="lesson" aria-label="차시·활동"><option value="">차시·활동 고르기</option>${unitObj.s.map((g) => `<optgroup label="${esc(g.t)}">${(g.l.length ? g.l : [g.t]).map((l) => `<option ${l === st.lesson ? 'selected' : ''}>${esc(l)}</option>`).join('')}</optgroup>`).join('')}<option value="__free" ${st.lesson === '__free' ? 'selected' : ''}>직접 입력</option></select>` : ''}
-        ${!unitObj || st.lesson === '__free' ? `<input data-igin="lessonFree" value="${esc(st.lessonFree)}" placeholder="예: 5차시 우리 동네 가게 알아보기" aria-label="차시 직접 입력">` : ''}
+        ${!unitObj || st.lesson === '__free' ? `<input data-igin="lessonFree" value="${esc(st.lessonFree)}" placeholder="예: 5차시 우리 동네 가게 알아보기" aria-label="차시 직접 입력">` : ''}`}
         <h3 class="ig-h">5. ${isEl ? '영역·내용 요소' : '성취기준'} <small class="muted">${esc(band)}</small></h3>
         ${sugg.length && !isEl ? `<div class="nt-chips ig-sugg"><span class="tiny muted">단원·차시와 낱말이 겹치는 성취기준(참고):</span>${sugg.map((c2) => `<button type="button" class="pr-chip sm ${c2 === st.code ? 'on' : ''}" data-ig="code" data-v="${esc(c2)}">${esc(c2)}</button>`).join('')}</div>` : ''}
         <select data-igin="code" aria-label="성취기준"><option value="">${isEl ? '내용 요소' : '성취기준'} 고르기</option>${stdOpts}</select>
@@ -318,7 +361,11 @@ export function openIepGen(sid) {
       m.addEventListener('change', (e) => {
         const k = e.target.dataset.igin; if (!k || k === 'draft') return;
         st[k] = e.target.value;
-        if (k === 'unit') { st.lesson = ''; }
+        if (k === 'unit') {
+          st.lesson = '';
+          const c2 = ctxOf();
+          if (c2.gu && c2.subj) { const first = [...c2.gu.m, ...c2.gu.r].find((cd) => findStd(c2.subj, c2.band, cd)); if (first) st.code = first; }
+        }
         paint();
       });
       m.addEventListener('input', (e) => {

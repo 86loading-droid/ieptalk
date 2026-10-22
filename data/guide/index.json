@@ -1,0 +1,486 @@
+{
+ "source": "교육부·국립특수교육원, 2022 개정 특수교육 기본 교육과정 교사용 지도서(초등 1~6학년, 중학교, 고등학교, 일상생활 활동)",
+ "note": "단원명·단원 목표·성취기준·차시 계획은 지도서 원문 그대로 옮겼습니다(원문 대조). 교육과정 원문(국가교육위원회 고시 제2026-2호)에 없는 코드는 선택할 수 없게 표시합니다.",
+ "keys": {
+  "고|art": {
+   "file": "h-art.json",
+   "units": 9,
+   "lessons": 36,
+   "books": [
+    "미술(1)",
+    "미술(2)"
+   ]
+  },
+  "고|career": {
+   "file": "h-career.json",
+   "units": 20,
+   "lessons": 298,
+   "books": [
+    "진로와 직업 1",
+    "진로와 직업 2"
+   ]
+  },
+  "고|kor": {
+   "file": "h-kor.json",
+   "units": 20,
+   "lessons": 276,
+   "books": [
+    "국어"
+   ]
+  },
+  "고|math": {
+   "file": "h-math.json",
+   "units": 20,
+   "lessons": 235,
+   "books": [
+    "수학"
+   ]
+  },
+  "고|music": {
+   "file": "h-music.json",
+   "units": 15,
+   "lessons": 105,
+   "books": [
+    "음악"
+   ]
+  },
+  "고|pe": {
+   "file": "h-pe.json",
+   "units": 16,
+   "lessons": 183,
+   "books": [
+    "체육"
+   ]
+  },
+  "고|sci": {
+   "file": "h-sci.json",
+   "units": 8,
+   "lessons": 201,
+   "books": [
+    "과학"
+   ]
+  },
+  "고|soc": {
+   "file": "h-soc.json",
+   "units": 14,
+   "lessons": 250,
+   "books": [
+    "사회"
+   ]
+  },
+  "공통|dl": {
+   "file": "all-dl.json",
+   "units": 45,
+   "lessons": 1378,
+   "books": [
+    "2022개정 신체활동 지도서",
+    "2022개정 여가활동 지도서",
+    "2022개정 의사소통 지도서",
+    "2022개정 자립생활 지도서"
+   ]
+  },
+  "중|art": {
+   "file": "m-art.json",
+   "units": 10,
+   "lessons": 40,
+   "books": [
+    "미술"
+   ]
+  },
+  "중|career": {
+   "file": "m-career.json",
+   "units": 20,
+   "lessons": 259,
+   "books": [
+    "진로와 직업 1",
+    "진로와 직업 2"
+   ]
+  },
+  "중|kor": {
+   "file": "m-kor.json",
+   "units": 22,
+   "lessons": 280,
+   "books": [
+    "국어"
+   ]
+  },
+  "중|math": {
+   "file": "m-math.json",
+   "units": 20,
+   "lessons": 230,
+   "books": [
+    "수학"
+   ]
+  },
+  "중|music": {
+   "file": "m-music.json",
+   "units": 15,
+   "lessons": 105,
+   "books": [
+    "음악"
+   ]
+  },
+  "중|pe": {
+   "file": "m-pe.json",
+   "units": 17,
+   "lessons": 206,
+   "books": [
+    "체육"
+   ]
+  },
+  "중|sci": {
+   "file": "m-sci.json",
+   "units": 8,
+   "lessons": 241,
+   "books": [
+    "과학"
+   ]
+  },
+  "중|soc": {
+   "file": "m-soc.json",
+   "units": 13,
+   "lessons": 242,
+   "books": [
+    "사회"
+   ]
+  },
+  "초1|bs": {
+   "file": "e1-bs.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을① 교사용 지도서",
+    "겨울① 교사용 지도서",
+    "봄① 교사용 지도서",
+    "여름① 교사용 지도서"
+   ]
+  },
+  "초1|jl": {
+   "file": "e1-jl.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을① 교사용 지도서",
+    "겨울① 교사용 지도서",
+    "봄① 교사용 지도서",
+    "여름① 교사용 지도서"
+   ]
+  },
+  "초1|kor": {
+   "file": "e1-kor.json",
+   "units": 20,
+   "lessons": 205,
+   "books": [
+    "1-2학년 국어"
+   ]
+  },
+  "초1|math": {
+   "file": "e1-math.json",
+   "units": 18,
+   "lessons": 206,
+   "books": [
+    "1-2학년 수학"
+   ]
+  },
+  "초1|ss": {
+   "file": "e1-ss.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을① 교사용 지도서",
+    "겨울① 교사용 지도서",
+    "봄① 교사용 지도서",
+    "여름① 교사용 지도서"
+   ]
+  },
+  "초2|bs": {
+   "file": "e2-bs.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을② 교사용 지도서",
+    "겨울② 교사용 지도서",
+    "봄② 교사용 지도서",
+    "여름② 교사용 지도서"
+   ]
+  },
+  "초2|jl": {
+   "file": "e2-jl.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을② 교사용 지도서",
+    "겨울② 교사용 지도서",
+    "봄② 교사용 지도서",
+    "여름② 교사용 지도서"
+   ]
+  },
+  "초2|kor": {
+   "file": "e2-kor.json",
+   "units": 20,
+   "lessons": 205,
+   "books": [
+    "1-2학년 국어"
+   ]
+  },
+  "초2|math": {
+   "file": "e2-math.json",
+   "units": 18,
+   "lessons": 206,
+   "books": [
+    "1-2학년 수학"
+   ]
+  },
+  "초2|ss": {
+   "file": "e2-ss.json",
+   "units": 16,
+   "lessons": 144,
+   "books": [
+    "가을② 교사용 지도서",
+    "겨울② 교사용 지도서",
+    "봄② 교사용 지도서",
+    "여름② 교사용 지도서"
+   ]
+  },
+  "초3|art": {
+   "file": "e3-art.json",
+   "units": 12,
+   "lessons": 120,
+   "books": [
+    "3-4학년 미술"
+   ]
+  },
+  "초3|kor": {
+   "file": "e3-kor.json",
+   "units": 10,
+   "lessons": 125,
+   "books": [
+    "3학년 국어"
+   ]
+  },
+  "초3|math": {
+   "file": "e3-math.json",
+   "units": 14,
+   "lessons": 203,
+   "books": [
+    "3-4학년 수학"
+   ]
+  },
+  "초3|music": {
+   "file": "e3-music.json",
+   "units": 8,
+   "lessons": 48,
+   "books": [
+    "3학년 음악"
+   ]
+  },
+  "초3|pe": {
+   "file": "e3-pe.json",
+   "units": 6,
+   "lessons": 76,
+   "books": [
+    "3학년 체육"
+   ]
+  },
+  "초3|sci": {
+   "file": "e3-sci.json",
+   "units": 9,
+   "lessons": 100,
+   "books": [
+    "3학년 과학"
+   ]
+  },
+  "초3|soc": {
+   "file": "e3-soc.json",
+   "units": 10,
+   "lessons": 94,
+   "books": [
+    "3학년 사회"
+   ]
+  },
+  "초4|art": {
+   "file": "e4-art.json",
+   "units": 12,
+   "lessons": 120,
+   "books": [
+    "3-4학년 미술"
+   ]
+  },
+  "초4|kor": {
+   "file": "e4-kor.json",
+   "units": 10,
+   "lessons": 124,
+   "books": [
+    "4학년 국어"
+   ]
+  },
+  "초4|math": {
+   "file": "e4-math.json",
+   "units": 14,
+   "lessons": 203,
+   "books": [
+    "3-4학년 수학"
+   ]
+  },
+  "초4|music": {
+   "file": "e4-music.json",
+   "units": 8,
+   "lessons": 49,
+   "books": [
+    "4학년 음악"
+   ]
+  },
+  "초4|pe": {
+   "file": "e4-pe.json",
+   "units": 6,
+   "lessons": 69,
+   "books": [
+    "4학년 체육"
+   ]
+  },
+  "초4|sci": {
+   "file": "e4-sci.json",
+   "units": 9,
+   "lessons": 99,
+   "books": [
+    "4학년 과학"
+   ]
+  },
+  "초4|soc": {
+   "file": "e4-soc.json",
+   "units": 10,
+   "lessons": 94,
+   "books": [
+    "4학년 사회"
+   ]
+  },
+  "초5|art": {
+   "file": "e5-art.json",
+   "units": 7,
+   "lessons": 21,
+   "books": [
+    "5학년 미술"
+   ]
+  },
+  "초5|kor": {
+   "file": "e5-kor.json",
+   "units": 10,
+   "lessons": 92,
+   "books": [
+    "5학년 국어"
+   ]
+  },
+  "초5|math": {
+   "file": "e5-math.json",
+   "units": 18,
+   "lessons": 262,
+   "books": [
+    "5-6학년 수학"
+   ]
+  },
+  "초5|music": {
+   "file": "e5-music.json",
+   "units": 8,
+   "lessons": 72,
+   "books": [
+    "5학년 음악"
+   ]
+  },
+  "초5|pe": {
+   "file": "e5-pe.json",
+   "units": 5,
+   "lessons": 102,
+   "books": [
+    "5학년 체육"
+   ]
+  },
+  "초5|prac": {
+   "file": "e5-prac.json",
+   "units": 6,
+   "lessons": 68,
+   "books": [
+    "5학년 실과"
+   ]
+  },
+  "초5|sci": {
+   "file": "e5-sci.json",
+   "units": 7,
+   "lessons": 94,
+   "books": [
+    "5학년 과학"
+   ]
+  },
+  "초5|soc": {
+   "file": "e5-soc.json",
+   "units": 12,
+   "lessons": 107,
+   "books": [
+    "5학년 사회"
+   ]
+  },
+  "초6|art": {
+   "file": "e6-art.json",
+   "units": 7,
+   "lessons": 21,
+   "books": [
+    "6학년 미술"
+   ]
+  },
+  "초6|kor": {
+   "file": "e6-kor.json",
+   "units": 10,
+   "lessons": 91,
+   "books": [
+    "6학년 국어"
+   ]
+  },
+  "초6|math": {
+   "file": "e6-math.json",
+   "units": 18,
+   "lessons": 262,
+   "books": [
+    "5-6학년 수학"
+   ]
+  },
+  "초6|music": {
+   "file": "e6-music.json",
+   "units": 8,
+   "lessons": 69,
+   "books": [
+    "6학년 음악"
+   ]
+  },
+  "초6|pe": {
+   "file": "e6-pe.json",
+   "units": 5,
+   "lessons": 102,
+   "books": [
+    "6학년 체육"
+   ]
+  },
+  "초6|prac": {
+   "file": "e6-prac.json",
+   "units": 6,
+   "lessons": 68,
+   "books": [
+    "6학년 실과"
+   ]
+  },
+  "초6|sci": {
+   "file": "e6-sci.json",
+   "units": 8,
+   "lessons": 102,
+   "books": [
+    "6학년 과학"
+   ]
+  },
+  "초6|soc": {
+   "file": "e6-soc.json",
+   "units": 12,
+   "lessons": 107,
+   "books": [
+    "6학년 사회"
+   ]
+  }
+ }
+}

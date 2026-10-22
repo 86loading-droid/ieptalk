@@ -4,12 +4,20 @@
 const cache = {};
 const BASE = 'data/';
 async function getJson(path) {
-  if (!cache[path]) cache[path] = fetch(BASE + path + '?v=21').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).catch((e) => { delete cache[path]; throw e; });
+  if (!cache[path]) cache[path] = fetch(BASE + path + '?v=25').then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); }).catch((e) => { delete cache[path]; throw e; });
   return cache[path];
 }
 export const loadIndex = () => getJson('cur/index.json');
 export const loadSubject = (id) => getJson(`cur/${id}.json`);
 export const loadUnits = () => getJson('units.json');
+// 교사용 지도서(2022 개정 기본 교육과정) 단원·차시 계획: 학년·교과마다 파일 하나
+export const loadGuideIndex = () => getJson('guide/index.json');
+export const loadGuide = (file) => getJson('guide/' + file);
+export function guideKey(grade, subjId, idx) {
+  const lv = grade === '전공과' ? '고' : /^[중고]/.test(grade) ? grade[0] : grade;
+  for (const k of [`${grade}|${subjId}`, `${lv}|${subjId}`, `공통|${subjId}`]) if (idx?.keys?.[k]) return k;
+  return '';
+}
 
 // 학년 → 학년군(성취기준 묶음)
 export const GRADES = [

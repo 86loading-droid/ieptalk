@@ -59,10 +59,10 @@ async def main():
       chk(any('보완대체의사소통의 탐색과 선택' in o for o in opts), 'daily-life elements')
       await pg.select_option('.ig [data-igin="code"]', '일상1-2'); doc = await pg.input_value('.ig-edit')
       chk('내용 요소' in doc, 'element draft')
-      # 중1 수학: 차례 없음 → 직접 입력
-      await pg.click('.ig [data-ig="grade"][data-v="중1"]'); await pg.click('.ig [data-ig="subj"][data-v="math"]'); await pg.wait_for_selector('.ig [data-igin="unitFree"]')
+      # 중1 정보통신활용: 지도서 차례 없음 → 직접 입력
+      await pg.click('.ig [data-ig="grade"][data-v="중1"]'); await pg.click('.ig [data-ig="subj"][data-v="ict"]'); await pg.wait_for_selector('.ig [data-igin="unitFree"]')
       chk(await pg.locator('.ig [data-igin="unit"]').count() == 0, 'no units → free input')
-      await pg.fill('.ig [data-igin="unitFree"]', '화폐 사용하기'); await pg.locator('.ig [data-igin="lessonFree"]').focus(); await pg.wait_for_timeout(150)
+      await pg.fill('.ig [data-igin="unitFree"]', '컴퓨터와 스마트 기기 사용하기'); await pg.locator('.ig [data-igin="lessonFree"]').focus(); await pg.wait_for_timeout(150)
       chk(await pg.locator('.ig-sugg button').count() >= 1, 'suggestions from unit words')
       ow = await pg.evaluate('document.documentElement.scrollWidth - window.innerWidth')
       chk(ow <= 1, f'no hscroll iepgen {ow}')

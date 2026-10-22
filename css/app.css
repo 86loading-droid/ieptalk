@@ -975,3 +975,9 @@ textarea.ig-edit { display: block; width: 100%; min-height: 18rem; resize: verti
 .fm-cbg { fill-opacity: .92; }
 .fm-vw { display: none; }
 @media (max-width: 760px) { .fm-h { display: none; } .fm-vw { display: block; } .fm.fm-v { max-height: none; } }
+
+/* v25 지도서 단원·차시 */
+.ig-unit { border: 1px solid var(--line); border-radius: 10px; padding: .5rem .7rem; margin: .4rem 0; background: var(--primary-soft); }
+.ig-unit ul { margin: .3rem 0 .2rem 1.1rem; padding: 0; }
+.pr-chip.off { opacity: .55; border-style: dashed; cursor: default; }
+.ig-lc { margin: .3rem 0 .4rem 1.1rem; padding: 0; color: var(--text); }
