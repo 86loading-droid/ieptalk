@@ -371,7 +371,7 @@ export function demoTeam(u) {
   DAYS.forEach(([d], di) => { duty[d] = {}; DEFAULT_TEAM_PERIODS.forEach((p, pi) => {
     const c = { s1: roster.s1.p1, s2: roster.s2.p1, s3: roster.s3.p1, s4: roster.s4.p1, s5: roster.s5.p1 };
     if ((di + pi) % 3 === 1) { c.s3 = 'x-sub'; }
-    if (p.k === 'lunch') { c.s4 = roster.s4.p2; }
+    if (p.k === 'lunch') { c.s4 = u.t2 || roster.s4.p1; }
     duty[d][p.k] = c;
   }); });
   duty.wed.p3.s3 = u.cm; // 겹침 예시(소통자와 수업 대체에 같은 사람)

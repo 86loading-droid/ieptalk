@@ -218,13 +218,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 8) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 9) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 8, school: { ...defaultSchool(), supportTeam: demoTeam({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' }) }, c: {} };
+    const d = { v: 9, school: { ...defaultSchool(), supportTeam: demoTeam({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' }) }, c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));

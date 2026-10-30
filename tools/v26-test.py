@@ -48,6 +48,7 @@ async def main():
       chk(await pg.locator('.tm-duty tbody tr').count() == 7, 'seven periods')
       iss = await pg.inner_text('.tm-issues')
       chk('두 자리 이상' in iss, 'overlap detected')
+      chk(iss.count('두 자리 이상') == 1, f"exactly one demo overlap {iss.count('두 자리 이상')}")
       chk('금 6교시' in iss and '수업 대체' in iss, 'gap detected')
       chk(await pg.locator('.tm-duty td.tm-bad').count() >= 1, 'bad cell highlighted')
       # 고치기: 수 3교시 수업 대체를 박지민으로
