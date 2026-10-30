@@ -81,7 +81,7 @@ async def main():
       chk(ow<=1, f'no modal hscroll {ow}')
       await pg.screenshot(path=f'{OUT}/pir_{vw[0]}.png', full_page=False)
       await pg.click('.pr-top [data-close]'); await pg.wait_for_timeout(300)
-      chk(await pg.locator('.card.incident').count()==2, 'two incidents now')
+      chk(await pg.locator('.card.incident').count()==3, 'three incidents now (demo ic1, ic2 + new)')
       await ctx.close()
     await b.close()
 asyncio.run(main())

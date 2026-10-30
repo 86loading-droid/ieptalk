@@ -8,6 +8,7 @@ import { confirmInline, INTENSITY } from './record.js';
 import { openMeetingModal } from './calendar.js';
 import { sendAlert } from './alerts.js';
 import { pirStatus } from './pireport.js';
+import { deployFieldset, deployFromForm, fillDeploy } from './team.js';
 
 const isSchoolDay = (d) => { const w = parseDate(d).getDay(); return w !== 0 && w !== 6 && !HOLIDAYS[d]; };
 export function schoolDaysAfter(d, n) { let x = d, k = 0; while (k < n) { x = addDays(x, 1); if (isSchoolDay(x)) k++; } return x; }
@@ -96,6 +97,7 @@ function form(ic, sid) {
       <div class="row3">${inp('restraintMethod', '제지 방법', 'text', '예: 양팔을 잡아 자리로 안내')}${inp('rStart', '제지 시작', 'time')}${inp('rEnd', '제지 끝', 'time')}</div>
       <div class="row2">${inp('injuryStudent', '학생 부상', 'text', '없음 / 있음(내용)')}${inp('injuryStaff', '교직원 부상', 'text', '없음 / 있음(내용)')}</div>
     </fieldset>
+    ${deployFieldset(ic)}
     <fieldset><legend>2. 보고·통지</legend>
       <div class="row2">${inp('reportedAt', '학교장 보고 일시', 'datetime-local')}${inp('reportedTo', '보고한 사람', 'text', '예: 교장, 교감')}</div>
       <div class="row2">${inp('notifiedAt', '보호자 통지 일시', 'datetime-local')}<label>통지 방법<select name="notifyMethod">${['', '전화', '문자', '면담', '서면'].map((x) => `<option ${ic.notifyMethod === x ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
@@ -138,13 +140,15 @@ export function openIncident(id, sid, eventId = '') {
     onOpen: (m) => {
       const del = m.querySelector('[data-del]');
       if (del) del.onclick = async () => { if (!confirmInline(del)) return; await S.store.remove('incidents', {}, ic.id); closeModal(); toast('사후 기록을 지웠습니다'); };
+      const fl = m.querySelector('[data-dp-fill]');
+      if (fl) fl.onclick = () => fillDeploy(m);
       const nt = m.querySelector('[data-notify]');
       if (nt) nt.onclick = async () => { await notifyTeam(ic); toast('IEP 팀에 알림을 보냈습니다'); };
       const mt = m.querySelector('[data-meet]');
       if (mt) mt.onclick = () => { const s = student(sid); openMeetingModal({ kind: 'meeting', title: `${s?.alias || ''} 위기행동 팀 회고`, attendeeUids: s?.teamUids || [], studentId: sid, date: debriefDue(ic) || todayStr(), memo: `${fmtDate(ic.date)} 사건 회고: 무엇이 도움이 되었는지, 재발 방지 조치` }); };
     },
     onSubmit: async (fd) => {
-      const data = fdData(fd);
+      const data = { ...fdData(fd), deploy: deployFromForm(fd, ic) };
       if (ic.id) { await S.store.update('incidents', {}, ic.id, data); toast('사후 기록을 저장했습니다'); return; }
       const nid = await S.store.create('incidents', {}, { ...data, studentId: sid, eventId: ic.eventId || '', createdBy: S.me.uid, createdAt: Date.now() });
       if (ic.eventId) S.store.update('bevents', {}, ic.eventId, { incidentId: nid }).catch(() => {});

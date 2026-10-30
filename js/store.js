@@ -3,6 +3,7 @@
 import { FIREBASE_CONFIG, SCHOOL_ID, OWNER_EMAILS, USE_EMULATOR } from './config.js';
 import { newId, todayStr, addDays } from './util.js';
 import { acadExamples, apptExamples } from './calExamples.js';
+import { demoTeam } from './views/team.js';
 
 const S = SCHOOL_ID;
 const pathOf = (kind, p = {}) => ({
@@ -194,7 +195,18 @@ export function demoSeed(uids) {
       after: [{ id: 'after1', l: '안정 공간으로 이동', t: '학생이 완충 매트 등 안정 공간으로 이동하였습니다.' }],
       stu: [{ id: 'stu0', l: '이상 없음', t: '학생에게 눈에 보이는 상처나 신체 이상이 없음을 확인하였습니다.' }], staffSt: [{ id: 'staffSt0', l: '이상 없음', t: '교직원에게 부상이 없음을 확인하였습니다.' }], injDetail: '',
       rep: [{ id: 'rep1', l: '구두 보고', t: '학교장(관리자)에게 구두로 보고하였습니다.' }], par: [{ id: 'par1', l: '유선 고지', t: '보호자에게 전화로 알렸습니다.' }], parBy: '',
-      deb: [{ id: 'deb1', l: '진행 예정', t: '학생의 정서가 회복된 뒤 회복 대화를 할 예정입니다.' }], video: 'no', videoWhere: '', confirmer: '', extra: '' } }];
+      deb: [{ id: 'deb1', l: '진행 예정', t: '학생의 정서가 회복된 뒤 회복 대화를 할 예정입니다.' }], video: 'no', videoWhere: '', confirmer: '', extra: '' },
+    deploy: { called: '10:41', risk: 'high', staff: [
+      { slot: 's1', who: uids.cm, arrive: '10:41', end: '10:58', injury: false, injuryNote: '' },
+      { slot: 's2', who: uids.a1 || '', arrive: '10:43', end: '10:58', injury: true, injuryNote: '오른 손등 긁힘', state: 'ok', debrief: false, care: { rep: true } },
+      { slot: 's3', who: uids.t3 || '', arrive: '10:45', end: '11:20', injury: false, injuryNote: '' },
+      { slot: 's4', who: uids.a2 || '', arrive: '10:46', end: '11:20', injury: false, injuryNote: '' },
+      { slot: 's5', who: uids.t4 || '', arrive: '10:44', end: '11:05', injury: false, injuryNote: '' }] } },
+  { id: 'ic2', studentId: 's1', date: addDays(t, -16), time: '13:20', place: '특수학급 교실', antecedent: '점심 뒤 활동 전환 안내', behavior: '교구장을 두 차례 발로 차고 자기 머리를 손바닥으로 세 차례 침', prevent: '1) 휴식 카드 제시 2) 위험 물건 치움 3) 주변 학생 이동', restraint: false, restraintMethod: '', rStart: '', rEnd: '', injuryStudent: '없음', injuryStaff: '없음', reportedAt: `${addDays(t, -16)}T14:00`, reportedTo: '교감', notifiedAt: `${addDays(t, -16)}T15:10`, notifyMethod: '전화', debriefDate: addDays(t, -14), debriefAttendees: [uids.cm, uids.t2].filter(Boolean), debriefNotes: '휴식 카드가 효과 있었음. 점심 뒤 전환 예고를 5분 전으로 앞당김', hypothesis: '회피', bspChange: 'yes', actions: '전환 5분 전 시각 타이머(담임, 이번 주)', closed: true, createdBy: uids.cm, createdAt: Date.now() - 16 * 864e5, updatedAt: Date.now() - 14 * 864e5, sample: true,
+    deploy: { called: '13:21', risk: 'mid', staff: [
+      { slot: 's1', who: uids.cm, arrive: '13:21', end: '13:34', injury: false, injuryNote: '', state: 'ok', debrief: true },
+      { slot: 's2', who: uids.a2 || '', arrive: '13:24', end: '13:34', injury: false, injuryNote: '', state: 'ok', debrief: true },
+      { slot: 's5', who: uids.t4 || '', arrive: '13:25', end: '13:40', injury: false, injuryNote: '', state: 'ok', debrief: true }] } }];
   // 평가조정 한 장 예시
   const accoms = { s1: [{ id: 'ac1', subject: '국어', presentation: ['문항 읽어 주기', '글자 확대(14pt 이상)'], response: ['구두로 답하기'], timing: ['시간 1.5배'], setting: ['별도 공간'], scheduling: [], other: '', modification: false, modNote: '', sharedWith: [uids.t2].filter(Boolean), confirms: {}, effects: [], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }],
     s2: [{ id: 'ac2', subject: '수학', presentation: ['한 쪽에 문항 수 줄이기'], response: ['계산기 허용(연산 외 문항)'], timing: ['나눠 보기(2회)'], setting: [], scheduling: ['오전 시행'], other: '', modification: true, modNote: '수학 성취기준을 받아올림 없는 두 자리 덧셈 범위로 낮춤', sharedWith: [uids.t3].filter(Boolean), confirms: uids.t3 ? { [uids.t3]: Date.now() - 86400e3 } : {}, effects: [{ d: addDays(t, -3), by: uids.cm, text: '나눠 보기 후 미응답 문항이 줄어듦' }], createdBy: uids.cm, updatedBy: uids.cm, createdAt: Date.now(), updatedAt: Date.now(), sample: true }] };
@@ -206,13 +218,13 @@ function makeDemoStore() {
   let db = load();
   const listeners = new Set();
   function load() {
-    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 7) return j; } catch {}
+    try { const j = JSON.parse(localStorage.getItem(DEMO_KEY)); if (j && j.v === 8) return j; } catch {}
     return seedDb();
   }
   function seedDb() {
     const u = Object.fromEntries(DEMO_USERS.map((x) => [x.uid, x]));
     const sd = demoSeed({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' });
-    const d = { v: 7, school: defaultSchool(), c: {} };
+    const d = { v: 8, school: { ...defaultSchool(), supportTeam: demoTeam({ cm: 'u-admin', t2: 'u-t2', t3: 'u-t3', t4: 'u-t4', a1: 'u-a1', a2: 'u-a2' }) }, c: {} };
     const put = (path, row) => { (d.c[path] ||= {})[row.id] = row; };
     DEMO_USERS.forEach((x) => put(pathOf('members'), { id: x.uid, ...x, active: true }));
     sd.students.forEach((s) => put(pathOf('students'), s));

@@ -10,6 +10,7 @@ import * as Chat from './views/chat.js';
 import * as Cal from './views/calendar.js';
 import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
+import * as Team from './views/team.js';
 import { alertsBar } from './views/alerts.js';
 import './views/acadImport.js';
 import './views/observe.js';
@@ -23,14 +24,15 @@ const TEACHER_NAV = [
   ['students', '학생·IEP', 'M12 12a4 4 0 100-8 4 4 0 000 8zm-7 9a7 7 0 0114 0'],
   ['behavior', '행동 기록', 'M12 3v18M3 12h18'],
   ['chat', '메신저', 'M4 5h16v11H8l-4 4z'],
-  ['calendar', '일정·예약', 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5']
+  ['calendar', '일정·예약', 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5'],
+  ['team', '지원팀', 'M8 11a3 3 0 100-6 3 3 0 000 6zm8 0a3 3 0 100-6 3 3 0 000 6zM2 20a6 6 0 0112 0M12 20a6 6 0 0110 0']
 ];
 const ADMIN_NAV = ['admin', '관리', 'M12 8a4 4 0 100 8 4 4 0 000-8zM3 12h2m14 0h2M12 3v2m0 14v2'];
 const AIDE_NAV = [
   ['record', '기록하기', 'M12 3v18M3 12h18'],
   ['mine', '내 기록', 'M5 4h14v16H5zM8 9h8M8 13h8']
 ];
-const VIEWS = { today: Today, tasks: { render: Today.renderTasks }, students: Students, student: Students, behavior: Behavior, chat: Chat, calendar: Cal, admin: Admin, record: Aide, mine: Aide };
+const VIEWS = { today: Today, tasks: { render: Today.renderTasks }, students: Students, student: Students, behavior: Behavior, chat: Chat, calendar: Cal, team: Team, admin: Admin, record: Aide, mine: Aide };
 
 function parseRoute() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
