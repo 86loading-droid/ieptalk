@@ -388,27 +388,65 @@ export function dutyNow(date = todayStr(), hm = timeStr()) {
   const cell = p ? t.duty?.[DAYS[w - 1][0]]?.[p.k] || {} : {};
   return { p, who: Object.fromEntries(t.slots.map((s) => [s.k, cell[s.k] || t.roster[s.k]?.p1 || ''])) };
 }
+// 전체 지원팀: 명부 1·2순위와 당번표에 한 번이라도 들어간 사람
+export function teamAll() {
+  const t = team(), ids = new Map();
+  t.slots.forEach((s) => ['p1', 'p2'].forEach((q) => { const id = t.roster[s.k]?.[q]; if (id && !ids.has(id)) ids.set(id, s.k); }));
+  DAYS.forEach(([d]) => t.periods.forEach((p) => t.slots.forEach((s) => { const id = t.duty?.[d]?.[p.k]?.[s.k]; if (id && !ids.has(id)) ids.set(id, s.k); })));
+  return [...ids].map(([id, k]) => ({ id, slot: k, app: !!member(id) && member(id).role !== 'aide' && member(id).active !== false }));
+}
+const myDesk = () => S.desk || {};
+export const sosPlaces = () => (myDesk().sosPlaces || []).filter(Boolean);
+function sosForm(sid) {
+  const all = teamAll(), places = sosPlaces(), defSid = sid || myDesk().sosSid || '';
+  return `<form class="tm-sos-form"><h2>지원팀 긴급 호출</h2>
+    <p class="tm-sos-q">확인을 누르면 아래 지원팀에게 바로 깜박이는 알림이 갑니다.</p>
+    <fieldset><legend>장소</legend>${places.length ? `<div class="tm-chips">${places.map((p, i) => `<label class="tm-chip"><input type="radio" name="place" value="${esc(p)}" ${i === 0 ? 'checked' : ''}><span>${esc(p)}</span></label>`).join('')}</div>` : '<p class="small warn-t">미리 정한 장소가 없습니다. 아래 「장소 미리 정하기」에서 한 번만 적어 두세요. 지금은 장소 없이 보냅니다.</p>'}</fieldset>
+    <label>학생(고르면 사후 기록이 바로 만들어집니다)<select name="sid"><option value="">고르지 않음</option>${S.students.map((x) => `<option value="${x.id}" ${x.id === defSid ? 'selected' : ''}>${esc(x.alias)}</option>`).join('')}</select></label>
+    <fieldset><legend>받는 사람 <span class="small"><button type="button" class="link sm" data-sos-all="1">모두</button> · <button type="button" class="link sm" data-sos-all="0">모두 빼기</button></span></legend>
+    <ul class="rows tm-sos-to">${all.map((x) => `<li><label class="chk"><input type="checkbox" name="to" value="${esc(x.id)}" checked> <b>${esc(personName(x.id))}</b> <small class="muted">${esc(slotName(x.slot))}</small></label><span class="grow"></span>${x.app ? '<small class="ok-t">앱 알림</small>' : '<small class="warn-t">전화·인터폰</small>'}</li>`).join('') || '<li class="muted">지원팀 명부가 비어 있습니다. 지원팀 화면에서 먼저 정해 주세요.</li>'}</ul></fieldset>
+    <details class="tm-sos-set"><summary>장소 미리 정하기(한 줄에 하나, 맨 위가 기본)</summary>
+      <textarea name="places" rows="3" placeholder="예:&#10;특수학급(3층 301호)&#10;4-2 통합학급&#10;체육관">${esc(places.join('\n'))}</textarea>
+      <button type="button" class="ghost sm" data-sos-save>장소·학생 기본값 저장</button></details>
+    <p class="small muted">보조인력과 앱 계정이 없는 사람은 앱 알림을 받지 못합니다. 전화·인터폰으로 함께 부르세요. 112·119 신고가 필요하면 먼저 신고합니다.</p>
+    <div class="actions"><button type="button" class="ghost" data-close>닫기</button><span class="grow"></span><button type="submit" class="tm-sos big" data-sos-go>확인 — 전체 송출</button></div></form>`;
+}
 export function openSos(sid = '') {
-  const t = team(), { p, who } = dutyNow();
-  const rows = t.slots.map((s, i) => { const id = who[s.k]; const acc = id && member(id) && member(id).role !== 'aide'; return `<li><span class="tm-badge tm-${s.k}">${i + 1}</span> <span class="grow">${esc(s.name)} · <b>${esc(personName(id) || '비어 있음')}</b> ${id ? (acc ? '<small class="ok-t">앱 알림</small>' : '<small class="warn-t">전화·인터폰으로 부르기</small>') : ''}</span></li>`; }).join('');
-  openModal(`<form class="tm-sos-form"><h2>지원팀 긴급 호출</h2>
-    <p class="small">${p ? `지금 ${esc(p.label)} 당번` : '당번표 시간이 아니라 1순위'}에게 깜박이는 알림을 보내고, 위기행동 사후 기록을 「지원팀 투입」 칸이 채워진 채로 바로 만듭니다.</p>
-    <ul class="rows">${rows}</ul>
-    <div class="row2"><label>학생<select name="sid" required><option value="">고르기</option>${S.students.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.alias)}</option>`).join('')}</select></label>
-    <label>장소<input name="place" required placeholder="예: 4-2 교실"></label></div>
-    <label>지금 상황(한 줄)<input name="what" placeholder="예: 의자를 들어 올림, 주변 학생 대피 중"></label>
-    <p class="small muted">보조인력과 앱 계정이 없는 사람은 알림을 받지 못합니다. 전화·인터폰으로 함께 부르세요. 112·119 신고가 필요하면 먼저 신고합니다.</p>
-    <div class="actions"><span class="grow"></span><button type="button" class="ghost" data-close>닫기</button><button type="submit" class="tm-sos">지금 부르기</button></div></form>`, {
+  openModal(sosForm(sid), {
+    onOpen: (m) => {
+      const f = m.querySelector('form'), go2 = m.querySelector('[data-sos-go]');
+      const label = () => { const boxes = [...f.querySelectorAll('input[name=to]')], n = boxes.filter((b) => b.checked).length; go2.textContent = n === boxes.length ? '확인 — 전체 송출' : `확인 — ${n}명에게 송출`; go2.disabled = n === 0; };
+      f.addEventListener('change', label);
+      m.querySelectorAll('[data-sos-all]').forEach((b) => { b.onclick = () => { f.querySelectorAll('input[name=to]').forEach((x) => { x.checked = b.dataset.sosAll === '1'; }); label(); }; });
+      const sv = m.querySelector('[data-sos-save]');
+      if (sv) sv.onclick = async () => {
+        const list = String(f.places.value || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 12);
+        await saveDeskSos({ sosPlaces: list, sosSid: f.sid.value || '' });
+        toast('긴급 호출 기본값을 저장했습니다'); openSos(f.sid.value || '');
+      };
+      setTimeout(() => go2.focus(), 30);
+    },
     onSubmit: async (fd) => {
-      const s2 = student(fd.get('sid')); const place = String(fd.get('place') || '').trim(), what = String(fd.get('what') || '').trim();
-      const now = timeStr(), to = Object.values(who).filter((id) => id && member(id) && member(id).role !== 'aide');
-      const nid = await S.store.create('incidents', {}, { studentId: s2.id, date: todayStr(), time: now, place, antecedent: '', behavior: what, prevent: '', restraint: false, createdBy: S.me.uid, createdAt: Date.now(), updatedBy: S.me.uid, updatedAt: Date.now(), closed: false,
-        deploy: { called: now, risk: '', sos: true, staff: t.slots.map((s) => ({ slot: s.k, who: who[s.k] || '', arrive: s.k === 's1' && who[s.k] === S.me.uid ? now : '', end: '', injury: false, injuryNote: '' })) } });
-      await sendAlert({ type: 'sos', title: `지원팀 긴급 호출 · ${place}`, text: `${s2.alias} · ${what || '위기행동'} · ${now} 호출`, to, self: false });
-      toast(`지원팀 ${to.length}명에게 알렸습니다`, { label: '사후 기록 열기', run: () => go(`#/student/${s2.id}/crisis`) });
-      return nid;
+      const t = team(), now = timeStr(), place = fd.get('place') || '', sid2 = fd.get('sid') || '';
+      const chosen = fd.getAll('to');
+      const to = chosen.filter((id) => member(id) && member(id).role !== 'aide');
+      const s2 = sid2 ? student(sid2) : null;
+      if (s2) {
+        const pick = (k) => chosen.includes(t.roster[k]?.p1) ? t.roster[k].p1 : chosen.includes(t.roster[k]?.p2) ? t.roster[k].p2 : '';
+        await S.store.create('incidents', {}, { studentId: s2.id, date: todayStr(), time: now, place, antecedent: '', behavior: '', prevent: '', restraint: false, createdBy: S.me.uid, createdAt: Date.now(), updatedBy: S.me.uid, updatedAt: Date.now(), closed: false,
+          deploy: { called: now, risk: '', sos: true, staff: t.slots.map((s) => ({ slot: s.k, who: dutyNow().who[s.k] && chosen.includes(dutyNow().who[s.k]) ? dutyNow().who[s.k] : pick(s.k), arrive: '', end: '', injury: false, injuryNote: '' })) } });
+      }
+      await sendAlert({ type: 'sos', title: `지원팀 긴급 호출${place ? ' · ' + place : ''}`, text: `${s2 ? s2.alias + ' · ' : ''}${now} 호출 · 보낸 사람 ${S.me.name}`, to });
+      const phone = chosen.length - to.length;
+      toast(`지원팀 ${to.length}명에게 알렸습니다${phone ? ` · ${phone}명은 전화로 부르세요` : ''}`, s2 ? { label: '사후 기록 열기', run: () => go(`#/student/${s2.id}/crisis`) } : undefined);
     }
   });
+}
+async function saveDeskSos(patch) {
+  const next = { ...(S.desk || {}), ...patch, owner: S.me.uid, updatedAt: Date.now() };
+  delete next.id;
+  S.desk = { ...next, id: S.me.uid };
+  await S.store.create('desks', {}, next, S.me.uid);
 }
 on('tm-sos', (el) => openSos(el.dataset.sid || ''));
 

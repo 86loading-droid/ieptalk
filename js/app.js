@@ -70,9 +70,9 @@ function shell(content) {
     </div>
   </header>
   ${netBanner()}${S.route?.name === 'today' || !VIEWS[S.route?.name] ? '' : alertsBar()}
-  <nav class="sidenav" aria-label="주 메뉴">${links}</nav>
+  <nav class="sidenav" aria-label="주 메뉴">${links}${isAide() ? '' : '<button type="button" class="sos-side" data-act="tm-sos" aria-haspopup="dialog">지원팀 긴급 호출</button>'}</nav>
   <main id="main" tabindex="-1">${content}</main>
-  <nav class="tabbar" aria-label="주 메뉴(하단)">${links}</nav>`;
+  <nav class="tabbar" aria-label="주 메뉴(하단)">${links}</nav>${isAide() ? '' : '<button type="button" class="sos-fab" data-act="tm-sos" aria-label="지원팀 긴급 호출">긴급<br>호출</button>'}`;
 }
 
 let lastRouteKey = '';
