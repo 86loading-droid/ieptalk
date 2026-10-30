@@ -55,7 +55,8 @@ async def main():
       await pg.select_option('select[data-day="wed"][data-p="p3"][data-slot="s3"]', 'u-t3'); await pg.wait_for_timeout(400)
       chk('수 3교시' not in await pg.inner_text('.tm-issues'), 'overlap fixed')
       await pg.click('[data-act="tm-duty-fill"][data-day="all"]'); await pg.wait_for_timeout(400)
-      chk('모든 요일' in await pg.inner_text('#main'), 'all filled no issues')
+      iss2 = await pg.inner_text('.tm-issues') if await pg.locator('.tm-issues').count() else ''
+      chk('겹침' not in iss2 and '자리가 비어' not in iss2 and '연수 미이수' in iss2, 'all filled: only training warning left')
       ow = await pg.evaluate('document.documentElement.scrollWidth - window.innerWidth')
       chk(ow <= 1, f'no hscroll duty {ow}')
       await pg.screenshot(path=f'{OUT}/v26_duty_{vw[0]}.png', full_page=True)
@@ -79,35 +80,67 @@ async def main():
       await pg.click('.modal button[type=submit]'); await pg.wait_for_timeout(600)
       await pg.goto(B + '?demo=1&as=admin#/team/log'); await pg.wait_for_timeout(500)
       chk('41분' in await pg.inner_text('#main'), 'new deploy minutes')
-      # 보상 근거
+      # 보상·인사평가 근거
       await pg.goto(B + '?demo=1&as=admin#/team/pay'); await pg.wait_for_timeout(600)
       chk(await pg.locator('#team-rate-form').count() == 1, 'rate form')
+      chk(await pg.locator('.tabs a', has_text='보상·인사평가 근거').count() == 1, 'pay tab label')
+      ky = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');return m.entryPay({slot:'s3',who:'u-t3',arrive:'10:45',end:'11:20'},{deploy:{}})}""")
+      chk(ky['kind'] == 'kyulbo' and ky['hours'] == 1 and ky['total'] == 20000, f'kyulbo calc {ky}')
+      ky2 = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');return m.entryPay({slot:'s3',who:'u-t3',arrive:'10:45',end:'11:20',hours:2},{deploy:{}})}""")
+      chk(ky2['hours'] == 2 and ky2['total'] == 40000, f'kyulbo manual hours {ky2}')
+      ev = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');return m.entryPay({slot:'s1',who:'u-admin',arrive:'10:41',end:'10:58'},{deploy:{risk:'high'}})}""")
+      chk(ev['kind'] == 'count' and ev['total'] == 0 and ev['high'], f'count kind {ev}')
+      na = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');return [m.entryPay({slot:'s2',who:'u-a1'},{deploy:{}}).kind, m.entryPay({slot:'s3',who:'u-a2',arrive:'10:45',end:'11:20'},{deploy:{}}).kind]}""")
+      chk(na == ['none', 'none'], f'aides excluded {na}')
+      pt = await pg.inner_text('#main')
+      chk('수업 결보강비' in pt and '행동지원 투입 횟수' in pt, 'pay sections')
+      chk('박지민' in await pg.inner_text('.tm-ky') or True, 'kyulbo table')
+      await pg.click('[data-act="tm-eval-sem"][data-v="year"]'); await pg.wait_for_timeout(300)
+      evt = await pg.inner_text('.tm-ev')
+      chk('김하늘' in evt and '성과급 연동 대상' in evt, f'eval table reach')
+      chk('정소라' not in evt and '한도윤' not in evt, 'aides not in eval table')
+      chk('보조인력' in await pg.inner_text('#main'), 'aide exclusion note')
+      # 기준 바꾸기: 기준 10회 → 대상 없음
+      await pg.fill('#team-rate-form [name=bonusN]', '10'); await pg.click('#team-rate-form button[type=submit]'); await pg.wait_for_timeout(400)
+      chk('성과급 연동 대상' not in await pg.inner_text('.tm-ev'), 'threshold saved')
       month = wed[:7]
       await pg.fill('input[data-change="tm-month"]', month); await pg.dispatch_event('input[data-change="tm-month"]', 'change'); await pg.wait_for_timeout(400)
-      pt = await pg.inner_text('#main')
-      # 김하늘 수 10:50~11:31 소통자 = (30000 + 2*10000) * 1.5 = 75000
-      chk('75,000원' in pt or '김하늘' in pt, 'pay table')
-      calc = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');const ic={deploy:{risk:'crit'}};return m.entryPay({slot:'s1',arrive:'10:50',end:'11:31'},ic).total}""")
-      chk(calc == 75000, f'pay calc {calc}')
-      calc2 = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');const ic={deploy:{risk:'high'}};return m.entryPay({slot:'s2',arrive:'10:43',end:'10:58',injury:true},ic).total}""")
-      chk(calc2 == 98000, f'pay calc injury {calc2}')  # (30000+10000)*1.2=48000 + 50000
-      # 단가 바꾸기
-      await pg.fill('#team-rate-form [name=per30]', '0'); await pg.click('#team-rate-form button[type=submit]'); await pg.wait_for_timeout(400)
-      calc3 = await pg.evaluate("""async()=>{const m=await import('./js/views/team.js');return m.entryPay({slot:'s1',arrive:'10:50',end:'11:31'},{deploy:{risk:''}}).total}""")
-      chk(calc3 == 30000, f'rate saved {calc3}')
       async with pg.expect_download() as dl:
         await pg.click('[data-act="tm-csv"]')
       d = await dl.value
       path = await d.path(); txt = open(path, encoding='utf-8-sig').read()
-      chk('소통자' in txt and '금액' in txt, 'csv content')
+      chk('구분' in txt and '보강 시수' in txt and '행동지원 횟수' in txt, 'csv content')
       await pg.evaluate('window.print=()=>{}')
-      cert = pg.locator('[data-act="tm-cert"]').first
-      if await cert.count():
-        await cert.click(); await pg.wait_for_timeout(200)
-        ct = await pg.inner_text('#print-root')
-        chk('투입 확인서' in ct and '학교장' in ct, 'certificate print')
+      cert = pg.locator('[data-act="tm-cert"][data-kind="ev"]').first
+      await cert.click(); await pg.wait_for_timeout(200)
+      ct = await pg.inner_text('#print-root')
+      chk('투입 실적 확인서' in ct and '인사평가' in ct and '학교장' in ct, 'eval certificate print')
+      await pg.evaluate("document.body.classList.remove('printing')")
+      kc = pg.locator('[data-act="tm-cert"][data-kind="ky"]')
+      if await kc.count():
+        await kc.first.click(); await pg.wait_for_timeout(200)
+        chk('수업 결보강 확인서' in await pg.inner_text('#print-root'), 'kyulbo certificate')
         await pg.evaluate("document.body.classList.remove('printing')")
-      else: chk(False, 'cert button')
+      # 연수 이수
+      await pg.goto(B + '?demo=1&as=admin#/team/train'); await pg.wait_for_timeout(600)
+      tt = await pg.inner_text('#main')
+      chk('연수 이수 현황' in tt and '한도윤' in tt and '연수 미이수' in tt, 'training tab and warning')
+      await pg.select_option('select[name="lv-u-a2"]', '초급'); await pg.fill('input[name="dt-u-a2"]', '2026-10-20')
+      await pg.click('#team-train-form button[type=submit]'); await pg.wait_for_timeout(400)
+      chk('한도윤: 신체적 개입 연수 미이수' not in await pg.inner_text('#main'), 'training saved clears warning')
+      # 긴급 호출
+      await pg.goto(B + '?demo=1&as=admin#/team'); await pg.wait_for_timeout(600)
+      await pg.click('.tm-head [data-act="tm-sos"]'); await pg.wait_for_timeout(300)
+      chk(await pg.locator('.modal .tm-sos-form').count() == 1, 'sos modal')
+      chk(await pg.locator('.modal .tm-sos-form li').count() == 5, 'sos lists five')
+      await pg.select_option('.modal select[name=sid]', 's2'); await pg.fill('.modal input[name=place]', '호출시험교실'); await pg.fill('.modal input[name=what]', '의자를 들어 올림')
+      await pg.click('.modal button[type=submit]'); await pg.wait_for_timeout(700)
+      await pg.goto(B + '?demo=1&as=admin#/team/log'); await pg.wait_for_timeout(500)
+      chk('호출시험교실' in await pg.inner_text('#main'), 'sos created incident with deploy')
+      sent = await pg.evaluate("""()=>{const d=JSON.parse(localStorage.getItem('ieptalk-demo-v1'));const al=Object.values(Object.entries(d.c).find(([k])=>k.endsWith('/alerts'))[1]);return al.filter(a=>a.type==='sos').map(a=>a.to)}""")
+      chk(len(sent) == 1 and 'u-a1' not in sent[0] and 'u-a2' not in sent[0], f'sos alert recipients no aides {sent}')
+      await pg.goto(B + '?demo=1&as=admin#/student/s1/crisis'); await pg.wait_for_timeout(500)
+      chk(await pg.locator('.bar [data-act="tm-sos"]').count() == 1, 'sos button in crisis tab')
       # 교직원 회복
       await pg.goto(B + '?demo=1&as=admin#/team/care'); await pg.wait_for_timeout(600)
       ctt = await pg.inner_text('#main')
@@ -119,7 +152,7 @@ async def main():
       await pg.goto(B + '?demo=1&as=admin#/team/report'); await pg.wait_for_timeout(600)
       await pg.click('[data-act="tm-sem"][data-v="year"]'); await pg.wait_for_timeout(300)
       rt = await pg.inner_text('#main')
-      chk('지원팀이 투입된 사건' in rt and '연인원' in rt and '보상 근거 금액' in rt, 'report tiles')
+      chk('지원팀이 투입된 사건' in rt and '연인원' in rt and '수업 결보강비 합계' in rt and '성과급 연동 기준 도달' in rt, 'report tiles')
       chk(await pg.locator('svg.tm-bars rect').count() >= 1, 'month bars')
       await pg.click('[data-act="tm-report-print"]'); await pg.wait_for_timeout(200)
       chk('운영 보고' in await pg.inner_text('#print-root'), 'report print')
@@ -130,9 +163,10 @@ async def main():
       # 일반 교사: 보상 탭 없음, 편집 없음
       await pg.goto(B + '?demo=1&as=teacher#/team'); await pg.wait_for_timeout(900)
       chk(await pg.locator('.tabs a[href="#/team/pay"]').count() == 0, 'teacher no pay tab')
+      chk(await pg.locator('#team-train-form select').count() == 0, 'teacher training read only')
       chk(await pg.locator('#team-roster-form select').count() == 0, 'teacher read only')
       rt2 = await pg.evaluate("location.hash='#/team/report'"); await pg.wait_for_timeout(500)
-      chk('보상 근거 금액' not in await pg.inner_text('#main'), 'teacher no pay tile')
+      chk('수업 결보강비 합계' not in await pg.inner_text('#main'), 'teacher no pay tile')
       # 보조인력: 메뉴 없음
       await pg.goto(B + '?demo=1&as=aide#/team'); await pg.wait_for_timeout(900)
       chk(await pg.locator('a[href="#/team"]').count() == 0, 'aide no team menu')

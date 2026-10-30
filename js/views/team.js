@@ -1,8 +1,10 @@
-// 지원팀: 위기행동 대응 전담 인력 5자리 배치도, 교시별 당번표와 공백 점검, 투입 기록, 보상 근거(관리자 단가), 교직원 회복 지원, 학기·연간 보고.
+// 지원팀: 위기행동 대응 전담 인력 5자리 배치도, 교시별 당번표와 공백 점검, 연수 이수 현황, 긴급 호출, 투입 기록, 보상·인사평가 근거, 교직원 회복 지원, 학기·연간 보고.
+// 보상(교수님 확정 2026-10-31): 3자리 수업 대체는 수업 결보강비(보강 시수 × 단가), 행동지원 자리는 투입 횟수를 세어 기준 이상이면 성과급 연동·인사평가 근거로 쓴다. 보조인력은 보상·인사평가에서 제외한다.
 // 5자리 이름은 교수님 확정(2026-10-30): 1 소통자, 2 지원대피 담당, 3 수업 대체, 4 수업지원, 5 연락 및 기록. 관리자가 이름과 설명을 고칠 수 있다.
 // 저장: 명부·당번표·단가는 학교 설정 문서(supportTeam, 관리자만 씀), 투입 기록은 위기행동 사후 기록(incidents)의 deploy 칸(교사가 씀). 보안 규칙 변경 없음.
-import { esc, todayStr, fmtDate, parseDate, toast } from '../util.js';
-import { S, on, rerender, isAdmin, teachers, aides, member, student } from '../state.js';
+import { esc, todayStr, timeStr, fmtDate, parseDate, toast, openModal, closeModal } from '../util.js';
+import { S, on, rerender, go, isAdmin, teachers, aides, member, student } from '../state.js';
+import { sendAlert } from './alerts.js';
 
 export const DEFAULT_SLOTS = [
   { k: 's1', name: '소통자', desc: '학생에게 한 사람만 말합니다. 한 팔 길이 이상 거리와 45도 자세를 지키고, 짧고 차분한 말로 안내하며 개입 시작과 종료를 판단합니다.' },
@@ -31,6 +33,10 @@ export const CARE = [
   ['psy', '심리 지원 기관 안내']
 ];
 
+export const BONUS_SLOTS = ['s1', 's2', 's4', 's5'];
+export const LEVELS = [['', '미이수'], ['초급', '초급'], ['중급', '중급'], ['고급', '고급']];
+const NEAR = ['s1', 's2']; // 학생 곁 자리: 연수 이수자만 권장
+
 /* ---------- 자료 ---------- */
 export function team() {
   const t = S.school?.supportTeam || {};
@@ -41,7 +47,8 @@ export function team() {
     extras: t.extras || [],
     periods: t.periods?.length ? t.periods : DEFAULT_TEAM_PERIODS,
     duty: t.duty || {},
-    rates: { base: {}, per30: 0, high: 0, crit: 0, injury: 0, note: '', ...(t.rates || {}) }
+    training: t.training || {},
+    rates: { kyulbo: 0, bonusN: 0, bonusSlots: BONUS_SLOTS, note: '', ...(t.rates || {}) }
   };
 }
 const saveTeam = (patch) => S.store.saveSchool({ supportTeam: { ...(S.school?.supportTeam || {}), ...patch } });
@@ -50,6 +57,10 @@ export function people() {
   const ms = [...teachers(), ...aides()].map((m) => ({ id: m.id, name: m.name, title: m.title || '' }));
   return [...ms, ...team().extras.map((x) => ({ id: x.id, name: x.name, title: x.title || '' }))];
 }
+// 보조인력: 계정 역할이 보조인력이거나, 계정 없는 인력 중 「보조인력」으로 넣은 사람. 보상·인사평가에서 제외한다.
+export const isAidePerson = (id) => member(id)?.role === 'aide' || team().extras.find((x) => x.id === id)?.kind === 'aide';
+export const trainOf = (id) => team().training?.[id] || {};
+const trained = (id) => !!trainOf(id).level;
 export const personName = (id) => (id ? member(id)?.name || team().extras.find((x) => x.id === id)?.name || '(지운 사람)' : '');
 const personOpts = (sel, empty = '비어 있음') => `<option value="">${empty}</option>${people().map((p) => `<option value="${esc(p.id)}" ${p.id === sel ? 'selected' : ''}>${esc(p.name)}${p.title ? ' · ' + esc(p.title) : ''}</option>`).join('')}`;
 const won = (n) => `${Math.round(n || 0).toLocaleString('ko-KR')}원`;
@@ -57,15 +68,19 @@ const toMin = (hm) => { const [h, m] = String(hm || '').split(':').map(Number); 
 
 /* ---------- 투입 기록 계산 ---------- */
 export function entryMin(st) { const a = toMin(st.arrive), b = toMin(st.end); return a == null || b == null ? null : Math.max(0, b - a); }
+// 수업 결보강 시수: 따로 적은 값이 있으면 그 값, 없으면 도착~끝과 겹치는 교시 수(점심 제외)
+export function coverHours(st, periods = team().periods) {
+  if (st.hours !== '' && st.hours != null && Number.isFinite(Number(st.hours))) return Number(st.hours);
+  const a = toMin(st.arrive), b = toMin(st.end);
+  if (a == null || b == null || b <= a) return 0;
+  return periods.filter((p) => p.k !== 'lunch' && toMin(p.start) < b && toMin(p.end) > a).length;
+}
+// 구분: kyulbo(수업 결보강비) / count(행동지원 횟수) / none(보조인력 등 제외)
 export function entryPay(st, ic, r = team().rates) {
-  const base = Number(r.base?.[st.slot]) || 0, per30 = Number(r.per30) || 0;
-  const min = entryMin(st) || 0;
-  const time = Math.ceil(min / 30) * per30;
-  const risk = ic.deploy?.risk;
-  const pct = risk === 'crit' ? Number(r.crit) || 0 : risk === 'high' ? Number(r.high) || 0 : 0;
-  const sub = Math.round((base + time) * (1 + pct / 100));
-  const inj = st.injury ? Number(r.injury) || 0 : 0;
-  return { base, time, pct, inj, total: sub + inj };
+  if (isAidePerson(st.who)) return { kind: 'none', hours: 0, total: 0 };
+  if (st.slot === 's3') { const hours = coverHours(st); return { kind: 'kyulbo', hours, total: hours * (Number(r.kyulbo) || 0) }; }
+  if ((r.bonusSlots || BONUS_SLOTS).includes(st.slot)) return { kind: 'count', hours: 0, total: 0, high: ['high', 'crit'].includes(ic.deploy?.risk) };
+  return { kind: 'none', hours: 0, total: 0 };
 }
 // 모든 투입 줄: { ic, st, i }
 export function entries(from = '', to = '9999') {
@@ -96,9 +111,14 @@ export function gapCheck(t = team()) {
     who.forEach((id) => { seen[id] = (seen[id] || 0) + 1; });
     Object.entries(seen).filter(([, n]) => n > 1).forEach(([id]) => issues.push({ kind: 'dup', day: d, p: p.k, who: id, text: `${dl} ${p.label}: ${personName(id)} 님이 두 자리 이상에 들어가 있습니다.` }));
   }));
+  // 연수 이수: 학생 곁 자리(1·2자리)에 미이수자
+  const nearBad = {};
+  NEAR.forEach((k) => { ['p1', 'p2'].forEach((q) => { const id = t.roster[k]?.[q]; if (id && !t.training?.[id]?.level) (nearBad[id] ||= new Set()).add(`${t.slots.find((s) => s.k === k).name} ${q === 'p1' ? '1' : '2'}순위`); }); });
+  DAYS.forEach(([d]) => t.periods.forEach((p) => NEAR.forEach((k) => { const id = t.duty?.[d]?.[p.k]?.[k]; if (id && !t.training?.[id]?.level) (nearBad[id] ||= new Set()).add(`${t.slots.find((s) => s.k === k).name} 당번`); })));
+  Object.entries(nearBad).forEach(([id, set]) => issues.push({ kind: 'train', who: id, text: `${personName(id)}: 신체적 개입 연수 미이수인데 ${[...set].join(', ')}에 들어가 있습니다.` }));
   return { issues, empties };
 }
-const cellIssue = (issues, d, p, k, id) => issues.some((x) => x.day === d && x.p === p && ((x.kind === 'dup' && x.who === id && id) || (x.kind === 'gap' && !id)));
+const cellIssue = (issues, d, p, k, id) => issues.some((x) => (x.day === d && x.p === p && ((x.kind === 'dup' && x.who === id && id) || (x.kind === 'gap' && !id))) || (x.kind === 'train' && id && x.who === id && NEAR.includes(k)));
 
 /* ---------- 5자리 배치도 ---------- */
 const NODE = { s1: [85, 82], s2: [225, 262], s3: [398, 108], s4: [462, 236], s5: [622, 172] };
@@ -111,7 +131,7 @@ export function teamMap(t = team(), { who = null } = {}) {
     return `<g class="tm-node tm-${s.k}" transform="translate(${x - 66} ${y - 30})"><rect width="132" height="60" rx="12"/>
       <circle cx="16" cy="16" r="11"/><text class="tm-no" x="16" y="20" text-anchor="middle">${i + 1}</text>
       <text class="tm-name" x="32" y="21">${esc(s.name)}</text>
-      <text class="tm-p1" x="12" y="40">${esc(p1 || '비어 있음')}</text>${p2 ? `<text class="tm-p2" x="12" y="54">2순위 ${esc(p2)}</text>` : ''}</g>`;
+      <text class="tm-p1" x="12" y="40">${esc(p1 || '비어 있음')}${!who && r.p1 && NEAR.includes(s.k) && !trained(r.p1) ? ' (연수 미이수)' : ''}</text>${p2 ? `<text class="tm-p2" x="12" y="54">2순위 ${esc(p2)}</text>` : ''}</g>`;
   };
   const label = t.slots.map((s, i) => `${i + 1} ${s.name}: ${personName((who || {})[s.k] || t.roster[s.k]?.p1) || '비어 있음'}`).join(', ');
   return `<svg class="tm-map" viewBox="0 0 780 330" role="img" aria-label="지원팀 5자리 배치도. ${esc(label)}">
@@ -130,12 +150,13 @@ export function teamMap(t = team(), { who = null } = {}) {
 }
 
 /* ---------- 화면 ---------- */
-const TABS = [['map', '5자리 배치도'], ['duty', '당번표·공백 점검'], ['log', '투입 기록'], ['pay', '보상 근거'], ['care', '교직원 회복'], ['report', '학기·연간 보고']];
+const TABS = [['map', '5자리 배치도'], ['duty', '당번표·공백 점검'], ['train', '연수 이수'], ['log', '투입 기록'], ['pay', '보상·인사평가 근거'], ['care', '교직원 회복'], ['report', '학기·연간 보고']];
 export function render(route) {
   const tab = TABS.some(([k]) => k === route.args[0]) ? route.args[0] : 'map';
   const tabs = TABS.filter(([k]) => k !== 'pay' || isAdmin());
-  const body = tab === 'duty' ? dutyTab() : tab === 'log' ? logTab() : tab === 'pay' ? (isAdmin() ? payTab() : '<p class="muted">관리자만 볼 수 있습니다.</p>') : tab === 'care' ? careTab() : tab === 'report' ? reportTab() : mapTab();
-  return `<div class="page-head"><h1>지원팀</h1><p class="muted">위기행동이 일어났을 때 함께 움직이는 전담 인력을 다섯 자리로 나누어 미리 정하고, 실제 투입을 기록해 보상과 회복 지원의 근거로 씁니다.</p></div>
+  const body = tab === 'duty' ? dutyTab() : tab === 'train' ? trainTab() : tab === 'log' ? logTab() : tab === 'pay' ? (isAdmin() ? payTab() : '<p class="muted">관리자만 볼 수 있습니다.</p>') : tab === 'care' ? careTab() : tab === 'report' ? reportTab() : mapTab();
+  return `<div class="page-head tm-head"><div><h1>지원팀</h1><p class="muted">위기행동이 일어났을 때 함께 움직이는 전담 인력을 다섯 자리로 나누어 미리 정하고, 실제 투입을 기록해 보상·인사평가와 회복 지원의 근거로 씁니다.</p></div>
+    <button type="button" class="tm-sos" data-act="tm-sos">지원팀 긴급 호출</button></div>
   <nav class="tabs" aria-label="지원팀 메뉴">${tabs.map(([k, l]) => `<a href="#/team/${k}" class="${k === tab ? 'on' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>${body}`;
 }
 
@@ -149,7 +170,7 @@ function mapTab() {
       : `<tr><th scope="row"><span class="tm-badge tm-${s.k}">${i + 1}</span></th><td><b>${esc(s.name)}</b><br><small>${esc(s.desc)}</small></td><td>${esc(personName(r.p1)) || '<span class="muted">비어 있음</span>'}</td><td>${esc(personName(r.p2)) || '<span class="muted">비어 있음</span>'}</td></tr>`;
   }).join('');
   const { issues } = gapCheck(t);
-  const rosterIss = issues.filter((x) => !x.day);
+  const rosterIss = issues.filter((x) => !x.day && x.kind !== 'train');
   return `<section class="card"><h2 class="h3">5자리 배치도</h2>
     <div class="tm-scroll">${teamMap(t)}</div><p class="tm-swipe small muted">그림을 옆으로 밀면 나머지 자리가 보입니다.</p>
     <p class="small muted">자리 번호는 움직이는 순서가 아니라 맡는 일입니다. 1·2자리는 학생 곁, 3·4자리는 다른 학생의 수업, 5자리는 연락과 기록을 맡습니다. 혼자 대응하지 않는 것이 원칙입니다(신체적 개입 과정 FIRST의 S 「혼자 하지 않는다」).</p>
@@ -165,8 +186,8 @@ function mapTab() {
 function extrasCard(t) {
   return `<section class="card"><h2 class="h3">앱 계정이 없는 지원 인력</h2>
     <p class="small">보건교사, 행정실 직원, 교육청 지원 인력처럼 IEP톡 계정이 없는 사람을 이름과 직책으로 넣어 자리에 배치할 수 있습니다. 실명 대신 직책만 적어도 됩니다.</p>
-    <ul class="rows">${t.extras.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b> <small class="muted">${esc(x.title || '')}</small></span><button type="button" class="link sm" data-act="tm-extra-del" data-id="${esc(x.id)}">빼기</button></li>`).join('') || '<li class="muted">아직 없습니다.</li>'}</ul>
-    <form id="team-extra-form" class="row3"><label>이름(또는 직책)<input name="name" required placeholder="예: 보건교사"></label><label>직책<input name="title" placeholder="예: 보건실"></label><span class="btns"><button type="submit" class="ghost">더하기</button></span></form>
+    <ul class="rows">${t.extras.map((x) => `<li><span class="grow"><b>${esc(x.name)}</b> <small class="muted">${esc(x.title || '')}${x.kind === 'aide' ? ' · 보조인력' : ''}</small></span><button type="button" class="link sm" data-act="tm-extra-del" data-id="${esc(x.id)}">빼기</button></li>`).join('') || '<li class="muted">아직 없습니다.</li>'}</ul>
+    <form id="team-extra-form" class="row3"><label>이름(또는 직책)<input name="name" required placeholder="예: 보건교사"></label><label>직책<input name="title" placeholder="예: 보건실"></label><label>구분<select name="kind"><option value="">교원·교직원</option><option value="aide">보조인력(보상·인사평가 제외)</option></select></label><span class="btns"><button type="submit" class="ghost">더하기</button></span></form>
   </section>`;
 }
 
@@ -191,7 +212,7 @@ function dutyTab() {
     <p class="small muted">교시마다 그 시간에 수업이 없거나 바로 움직일 수 있는 사람을 넣습니다. 담임이 수업 중인 시간에는 그 담임을 3자리(수업 대체)에 넣지 않습니다.</p>
   </section>
   <section class="card"><h2 class="h3">공백 점검 <small class="muted">빈 칸 ${empties} · 확인할 것 ${issues.length}</small></h2>
-    ${issues.length ? `<ul class="rows tm-issues">${[...issues.filter((x) => !x.day), ...dayIss.filter((x) => x.day === day), ...dayIss.filter((x) => x.day !== day)].slice(0, 40).map((x) => `<li class="${x.kind}"><span class="tag ${x.kind === 'dup' || x.kind === 'empty' ? 'warn' : ''}">${x.kind === 'dup' ? '겹침' : x.kind === 'soft' ? '대신할 사람' : '빈 자리'}</span><span class="grow">${esc(x.text)}</span></li>`).join('')}</ul>${issues.length > 40 ? `<p class="small muted">그 밖에 ${issues.length - 40}건</p>` : ''}`
+    ${issues.length ? `<ul class="rows tm-issues">${[...issues.filter((x) => !x.day && x.kind !== 'train'), ...issues.filter((x) => x.kind === 'train'), ...dayIss.filter((x) => x.day === day), ...dayIss.filter((x) => x.day !== day)].slice(0, 40).map((x) => `<li class="${x.kind}"><span class="tag ${x.kind === 'dup' || x.kind === 'empty' || x.kind === 'train' ? 'warn' : ''}">${x.kind === 'dup' ? '겹침' : x.kind === 'soft' ? '대신할 사람' : x.kind === 'train' ? '연수' : '빈 자리'}</span><span class="grow">${esc(x.text)}</span></li>`).join('')}</ul>${issues.length > 40 ? `<p class="small muted">그 밖에 ${issues.length - 40}건</p>` : ''}`
     : '<p class="ok-t">모든 요일·교시의 다섯 자리가 채워져 있고 겹친 사람이 없습니다.</p>'}
   </section>`;
 }
@@ -213,50 +234,75 @@ function logTab() {
 }
 
 const monthNow = () => todayStr().slice(0, 7);
-function payRows(month) {
-  const r = team().rates;
-  const list = entries(`${month}-01`, `${month}-31`);
-  const by = {};
-  list.forEach(({ ic, st }) => { const p = entryPay(st, ic, r); const o = (by[st.who] ||= { who: st.who, n: 0, min: 0, inj: 0, total: 0, miss: 0 }); o.n++; o.min += entryMin(st) || 0; o.miss += entryMin(st) == null ? 1 : 0; o.inj += st.injury ? 1 : 0; o.total += p.total; });
-  return { list, by: Object.values(by).sort((a, b) => b.total - a.total || b.n - a.n) };
+function semKeyNow() { return todayStr() >= (S.school?.sem2Start || '9999') ? 'sem2' : 'sem1'; }
+// 수업 결보강비: 3자리(수업 대체) 투입, 보조인력 제외, 달 단위
+function kyulboRows(month) {
+  const r = team().rates, by = {};
+  entries(`${month}-01`, `${month}-31`).forEach(({ ic, st }) => { const p = entryPay(st, ic, r); if (p.kind !== 'kyulbo') return; const o = (by[st.who] ||= { who: st.who, n: 0, hours: 0, total: 0 }); o.n++; o.hours += p.hours; o.total += p.total; });
+  return Object.values(by).sort((a, b) => b.total - a.total || b.hours - a.hours);
+}
+// 행동지원 투입 횟수: 정한 자리, 보조인력 제외, 학기·학년 단위
+export function evalRows(semKey) {
+  const t = team(), r = t.rates, [from, to] = semRange(semKey), by = {};
+  const n = Number(r.bonusN) || 0;
+  entries(from, to).forEach(({ ic, st }) => { const p = entryPay(st, ic, r); if (p.kind !== 'count') return; const o = (by[st.who] ||= { who: st.who, n: 0, high: 0, slots: {}, min: 0 }); o.n++; o.high += p.high ? 1 : 0; o.slots[st.slot] = (o.slots[st.slot] || 0) + 1; o.min += entryMin(st) || 0; });
+  return Object.values(by).map((o) => ({ ...o, reach: n > 0 && o.n >= n })).sort((a, b) => b.n - a.n);
 }
 function payTab() {
   const t = team(), r = t.rates;
   const month = S.ui.teamMonth || monthNow();
-  const { by } = payRows(month);
-  const noRate = !Object.values(r.base || {}).some((v) => Number(v)) && !Number(r.per30);
-  return `<section class="card"><h2 class="h3">단가 정하기 <small class="muted">관리자</small></h2>
+  const sem = ['sem1', 'sem2', 'year'].includes(S.ui.teamEvalSem) ? S.ui.teamEvalSem : semKeyNow();
+  const ky = kyulboRows(month), ev = evalRows(sem);
+  const aideN = new Set(entries().filter((x) => isAidePerson(x.st.who)).map((x) => x.st.who)).size;
+  const slotChk = t.slots.filter((s) => s.k !== 's3').map((s) => `<label class="chk small"><input type="checkbox" name="bs-${s.k}" ${(r.bonusSlots || BONUS_SLOTS).includes(s.k) ? 'checked' : ''}> ${esc(s.name)}</label>`).join('');
+  return `<section class="card"><h2 class="h3">기준 정하기 <small class="muted">관리자</small></h2>
     <form id="team-rate-form" class="stack">
-      <div class="tm-rate">${t.slots.map((s, i) => `<label><span class="tm-badge tm-${s.k}">${i + 1}</span> ${esc(s.name)} 1회<input type="number" min="0" step="100" name="base-${s.k}" value="${esc(r.base?.[s.k] ?? '')}" placeholder="원"></label>`).join('')}</div>
-      <div class="row3"><label>투입 30분마다 더함(원)<input type="number" min="0" step="100" name="per30" value="${esc(r.per30 || '')}"></label>
-      <label>고위험 가산(%)<input type="number" min="0" max="300" name="high" value="${esc(r.high || '')}"></label>
-      <label>치명적 위험 가산(%)<input type="number" min="0" max="300" name="crit" value="${esc(r.crit || '')}"></label></div>
-      <div class="row2"><label>부상 시 더함(원)<input type="number" min="0" step="100" name="injury" value="${esc(r.injury || '')}"></label>
-      <label>근거 규정(학교·교육청 기준 이름)<input name="note" value="${esc(r.note || '')}" placeholder="예: OO교육청 위기행동 대응 지원 기준(확인 필요)"></label></div>
-      <button type="submit" class="primary">단가 저장</button>
+      <div class="row3"><label>수업 결보강비 1시간 단가(원)<input type="number" min="0" step="100" name="kyulbo" value="${esc(r.kyulbo || '')}" placeholder="학교 결보강 수당 기준"></label>
+      <label>성과급 연동 기준(횟수 이상)<input type="number" min="0" max="200" name="bonusN" value="${esc(r.bonusN || '')}" placeholder="예: 5"></label>
+      <label>근거 규정(학교·교육청 기준 이름)<input name="note" value="${esc(r.note || '')}" placeholder="예: 학교 성과상여금 지급 기준(확인 필요)"></label></div>
+      <fieldset><legend class="small">횟수로 세는 행동지원 자리</legend><div class="chk-list">${slotChk}</div></fieldset>
+      <button type="submit" class="primary">기준 저장</button>
     </form>
-    <p class="small muted">계산: (자리 1회 단가 + 30분마다 단가 × 올림한 30분 수) × (1 + 위험 가산%) + 부상 시 더함. 단가와 근거 규정은 학교가 정합니다. IEP톡은 정해진 값으로 계산만 하며, 실제 지급 여부와 금액은 학교·교육청 규정을 따릅니다.</p>
+    <p class="small muted">3자리 수업 대체는 보강한 수업 시수 × 결보강 단가로 수업 결보강비를 계산합니다. 보강 시수는 도착~끝 시각과 겹치는 교시 수로 자동 계산하고, 사후 기록에서 직접 고칠 수 있습니다. 행동지원 자리는 금액 대신 투입 횟수를 세어, 기준 횟수 이상이면 「성과급 연동 대상」으로 표시해 인사평가(성과상여금 평가) 근거 자료로 씁니다. 보조인력(특수교육실무사·사회복무요원 등)은 결보강비와 인사평가 집계에서 제외합니다. 실제 지급과 평가 반영은 학교 규정과 다면평가 기준을 따릅니다.</p>
   </section>
-  <section class="card"><h2 class="h3">월별 합계</h2>
+  <section class="card"><h2 class="h3">수업 결보강비 <small class="muted">3자리 수업 대체</small></h2>
     <div class="bar"><label class="small">달<input type="month" data-change="tm-month" value="${esc(month)}"></label><span class="grow"></span><button type="button" class="ghost" data-act="tm-csv" data-month="${esc(month)}">CSV 내려받기</button></div>
-    ${noRate ? '<p class="alert warn">단가가 비어 있어 금액은 0원으로 나옵니다. 횟수와 시간은 그대로 셉니다.</p>' : ''}
-    <div class="tm-tbl-wrap"><table class="tm-tbl"><thead><tr><th>사람</th><th>횟수</th><th>투입 시간</th><th>부상</th><th>금액</th><th></th></tr></thead><tbody>
-    ${by.map((o) => `<tr><th scope="row">${esc(personName(o.who))}</th><td>${o.n}</td><td>${o.min}분${o.miss ? ` <small class="warn-t">시각 빠짐 ${o.miss}</small>` : ''}</td><td>${o.inj || '-'}</td><td><b>${won(o.total)}</b></td><td><button type="button" class="sm ghost" data-act="tm-cert" data-who="${esc(o.who)}" data-month="${esc(month)}">확인서 인쇄</button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">이 달 투입 기록이 없습니다.</td></tr>'}
-    </tbody></table></div></section>`;
+    ${!Number(r.kyulbo) ? '<p class="alert warn">결보강 단가가 비어 있어 금액은 0원으로 나옵니다. 시수는 그대로 셉니다.</p>' : ''}
+    <div class="tm-tbl-wrap"><table class="tm-tbl tm-ky"><thead><tr><th>사람</th><th>보강 횟수</th><th>보강 시수</th><th>결보강비</th><th></th></tr></thead><tbody>
+    ${ky.map((o) => `<tr><th scope="row">${esc(personName(o.who))}</th><td>${o.n}</td><td>${o.hours}시간</td><td><b>${won(o.total)}</b></td><td><button type="button" class="sm ghost" data-act="tm-cert" data-kind="ky" data-who="${esc(o.who)}" data-month="${esc(month)}">결보강 확인서</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">이 달 수업 대체 기록이 없습니다.</td></tr>'}
+    </tbody></table></div></section>
+  <section class="card"><h2 class="h3">행동지원 투입 횟수 <small class="muted">성과급 연동·인사평가 근거</small></h2>
+    <div class="tm-seg" role="group" aria-label="기간">${[['sem1', '1학기'], ['sem2', '2학기'], ['year', '학년 전체']].map(([v, l]) => `<button type="button" class="${v === sem ? 'on' : ''}" data-act="tm-eval-sem" data-v="${v}" aria-pressed="${v === sem}">${l}</button>`).join('')}</div>
+    ${!Number(r.bonusN) ? '<p class="alert warn">성과급 연동 기준 횟수가 비어 있어 대상 표시가 나오지 않습니다.</p>' : ''}
+    <div class="tm-tbl-wrap"><table class="tm-tbl tm-ev"><thead><tr><th>사람</th><th>투입 횟수</th><th>자리별</th><th>고위험 이상</th><th>연수</th><th>기준 ${Number(r.bonusN) || '-'}회</th><th></th></tr></thead><tbody>
+    ${ev.map((o) => `<tr><th scope="row">${esc(personName(o.who))}</th><td><b>${o.n}회</b></td><td><small>${Object.entries(o.slots).map(([k, n]) => `${esc(slotName(k))} ${n}`).join(' · ')}</small></td><td>${o.high}회</td><td>${esc(trainOf(o.who).level || '미이수')}</td><td>${o.reach ? '<span class="tag ok">성과급 연동 대상</span>' : Number(r.bonusN) ? `<small class="muted">${Math.max(0, Number(r.bonusN) - o.n)}회 남음</small>` : '-'}</td><td><button type="button" class="sm ghost" data-act="tm-cert" data-kind="ev" data-who="${esc(o.who)}" data-sem="${sem}">실적 확인서</button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">이 기간 행동지원 투입 기록이 없습니다.</td></tr>'}
+    </tbody></table></div>
+    ${aideN ? `<p class="small muted">보조인력 ${aideN}명의 투입은 기록에는 남지만 이 표와 결보강비에서 제외했습니다.</p>` : ''}</section>`;
 }
 
-function certHtml(who, month) {
-  const t = team(), r = t.rates;
-  const list = entries(`${month}-01`, `${month}-31`).filter((x) => x.st.who === who).reverse();
-  let sum = 0, min = 0;
-  const rows = list.map(({ ic, st }) => { const p = entryPay(st, ic, r); sum += p.total; min += entryMin(st) || 0; return `<tr><td>${esc(fmtDate(ic.date))} ${esc(ic.time || '')}</td><td>${esc(student(ic.studentId)?.alias || '')}</td><td>${esc(slotName(st.slot))}</td><td>${esc(st.arrive || '')}~${esc(st.end || '')} (${entryMin(st) ?? '-'}분)</td><td>${esc(RISK_L[ic.deploy?.risk || ''] === '선택' ? '' : RISK_L[ic.deploy?.risk || ''] || '')}</td><td>${st.injury ? '있음' : '없음'}</td><td>${ic.pir ? '있음' : '-'}</td><td>${won(p.total)}</td></tr>`; }).join('');
+function kyulboCert(who, month) {
+  const r = team().rates;
+  const list = entries(`${month}-01`, `${month}-31`).filter((x) => x.st.who === who && entryPay(x.st, x.ic, r).kind === 'kyulbo').reverse();
+  let sum = 0, hrs = 0;
+  const rows = list.map(({ ic, st }) => { const p = entryPay(st, ic, r); sum += p.total; hrs += p.hours; return `<tr><td>${esc(fmtDate(ic.date))}</td><td>${esc(st.arrive || '')}~${esc(st.end || '')}</td><td>${esc(ic.place || '')}</td><td>${p.hours}시간</td><td>${won(p.total)}</td></tr>`; }).join('');
   const [y, m] = month.split('-');
-  return `<h1>위기행동 지원 인력 투입 확인서</h1>
-    <p>${esc(S.school?.name || '')} · ${y}년 ${Number(m)}월 · 성명 ${esc(personName(who))}${member(who)?.title ? ` (${esc(member(who).title)})` : ''}</p>
-    <table class="pf"><thead><tr><th>일시</th><th>학생(가명)</th><th>자리</th><th>투입 시각(시간)</th><th>위험 수준</th><th>부상</th><th>사후 보고서</th><th>금액</th></tr></thead><tbody>${rows || '<tr><td colspan="8">투입 기록 없음</td></tr>'}</tbody>
-    <tfoot><tr><th colspan="3">합계 ${list.length}회</th><th>${min}분</th><th colspan="3"></th><th>${won(sum)}</th></tr></tfoot></table>
-    <p class="print-note">계산 기준: 자리 1회 단가, 30분마다 ${won(r.per30)}, 고위험 +${Number(r.high) || 0}%, 치명적 위험 +${Number(r.crit) || 0}%, 부상 시 +${won(r.injury)}. 근거 규정: ${esc(r.note || '학교가 정한 기준(확인 필요)')}.</p>
-    <p class="print-note">위 내용은 위기행동 사후 기록의 「지원팀 투입」 칸에 기록된 사실을 모은 것입니다. 학생 이름은 가명으로 적습니다.</p>
+  return `<h1>수업 결보강 확인서(위기행동 대응)</h1>
+    <p>${esc(S.school?.name || '')} · ${y}년 ${Number(m)}월 · 보강 교사 ${esc(personName(who))}${member(who)?.title ? ` (${esc(member(who).title)})` : ''}</p>
+    <table class="pf"><thead><tr><th>날짜</th><th>보강 시각</th><th>장소(학급)</th><th>보강 시수</th><th>결보강비</th></tr></thead><tbody>${rows || '<tr><td colspan="5">기록 없음</td></tr>'}</tbody>
+    <tfoot><tr><th colspan="3">합계 ${list.length}회</th><th>${hrs}시간</th><th>${won(sum)}</th></tr></tfoot></table>
+    <p class="print-note">계산: 보강 시수 × 1시간 단가 ${won(r.kyulbo)}. 근거 규정: ${esc(r.note || '학교 결보강 수당 기준(확인 필요)')}. 위기행동 사후 기록의 「지원팀 투입」 3자리(수업 대체) 기록을 모은 것입니다.</p>
+    <table class="pf sign"><tr><th>본인 확인</th><td></td><th>교무 담당</th><td></td><th>학교장</th><td></td></tr></table>`;
+}
+function evalCert(who, sem) {
+  const r = team().rates, [from, to, label] = semRange(sem);
+  const list = entries(from, to).filter((x) => x.st.who === who && entryPay(x.st, x.ic, r).kind === 'count').reverse();
+  const n = list.length, th = Number(r.bonusN) || 0;
+  const rows = list.map(({ ic, st }) => `<tr><td>${esc(fmtDate(ic.date))} ${esc(ic.time || '')}</td><td>${esc(student(ic.studentId)?.alias || '')}</td><td>${esc(slotName(st.slot))}</td><td>${esc(st.arrive || '')}~${esc(st.end || '')}</td><td>${esc(RISK_L[ic.deploy?.risk || ''] === '선택' ? '' : RISK_L[ic.deploy?.risk || ''] || '')}</td><td>${st.injury ? '있음' : '없음'}</td><td>${ic.pir ? '있음' : '-'}</td></tr>`).join('');
+  return `<h1>위기행동 행동지원 투입 실적 확인서</h1>
+    <p>${esc(S.school?.name || '')} · ${esc(label)}(${esc(fmtDate(from))}~${esc(fmtDate(to))}) · 성명 ${esc(personName(who))}${member(who)?.title ? ` (${esc(member(who).title)})` : ''} · 신체적 개입 연수 ${esc(trainOf(who).level || '미이수')}${trainOf(who).date ? `(${esc(fmtDate(trainOf(who).date))})` : ''}</p>
+    <table class="pf"><thead><tr><th>일시</th><th>학생(가명)</th><th>자리</th><th>투입 시각</th><th>위험 수준</th><th>부상</th><th>사후 보고서</th></tr></thead><tbody>${rows || '<tr><td colspan="7">기록 없음</td></tr>'}</tbody></table>
+    <p><b>투입 ${n}회</b>${th ? ` · 성과급 연동 기준 ${th}회 ${n >= th ? '이상(대상)' : '미만'}` : ''}</p>
+    <p class="print-note">이 확인서는 성과상여금 평가와 인사평가에 쓰는 근거 자료입니다. 반영 여부와 배점은 학교 다면평가 기준을 따릅니다. 근거 규정: ${esc(r.note || '학교 기준(확인 필요)')}. 학생 이름은 가명으로 적습니다.</p>
     <table class="pf sign"><tr><th>본인 확인</th><td></td><th>작성(관리자)</th><td></td><th>학교장</th><td></td></tr></table>`;
 }
 
@@ -296,8 +342,9 @@ export function reportData(k) {
   const inj = list.filter((x) => x.st.injury).length;
   const deb = list.filter((x) => x.st.debrief).length;
   const pay = list.reduce((a, x) => a + entryPay(x.st, x.ic).total, 0);
+  const reach = k === 'sem1' || k === 'sem2' || k === 'year' ? evalRows(k).filter((o) => o.reach).length : 0;
   const people = new Set(list.map((x) => x.st.who)).size;
-  return { from, to, label, n: ics.length, staff: list.length, people, min, inj, deb, resp: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null, bySlot, months, risk, pay };
+  return { reach, from, to, label, n: ics.length, staff: list.length, people, min, inj, deb, resp: resp.length ? Math.round(resp.reduce((a, b) => a + b, 0) / resp.length) : null, bySlot, months, risk, pay };
 }
 function reportHtml(k, { print = false } = {}) {
   const d = reportData(k), t = team();
@@ -307,7 +354,7 @@ function reportHtml(k, { print = false } = {}) {
   const bars = `<svg class="tm-bars" viewBox="0 0 ${ms.length * (bw + 10) + 20} 150" role="img" aria-label="월별 투입 건수 ${ms.map(([m, n]) => `${Number(m.slice(5))}월 ${n}건`).join(', ')}">${ms.map(([m, n], i) => { const h = Math.round((n / mx) * 100); const x = 10 + i * (bw + 10); return `<rect x="${x}" y="${118 - h}" width="${bw}" height="${h}" rx="4"/><text x="${x + bw / 2}" y="${112 - h}" text-anchor="middle">${n || ''}</text><text x="${x + bw / 2}" y="138" text-anchor="middle">${Number(m.slice(5))}월</text>`; }).join('')}<line x1="6" y1="118" x2="${ms.length * (bw + 10) + 14}" y2="118"/></svg>`;
   const tile = (v, l) => `<div class="tm-tile"><b>${v}</b><span>${l}</span></div>`;
   return `${print ? `<h1>위기행동 지원팀 운영 보고 (${esc(d.label)})</h1><p>${esc(S.school?.name || '')} · ${esc(fmtDate(d.from))}~${esc(fmtDate(d.to))}</p>` : ''}
-    <div class="tm-tiles">${tile(d.n + '건', '지원팀이 투입된 사건')}${tile(d.staff + '명', '연인원')}${tile(d.people + '명', '참여한 사람')}${tile(d.min + '분', '투입 시간 합계')}${tile(d.resp == null ? '-' : d.resp + '분', '호출부터 모두 도착까지(평균)')}${tile(d.inj + '건', '교직원 부상')}${tile(d.staff ? Math.round((d.deb / d.staff) * 100) + '%' : '-', '돌아보기 참석')}${isAdmin() ? tile(won(d.pay), '보상 근거 금액 합계') : ''}</div>
+    <div class="tm-tiles">${tile(d.n + '건', '지원팀이 투입된 사건')}${tile(d.staff + '명', '연인원')}${tile(d.people + '명', '참여한 사람')}${tile(d.min + '분', '투입 시간 합계')}${tile(d.resp == null ? '-' : d.resp + '분', '호출부터 모두 도착까지(평균)')}${tile(d.inj + '건', '교직원 부상')}${tile(d.staff ? Math.round((d.deb / d.staff) * 100) + '%' : '-', '돌아보기 참석')}${isAdmin() ? tile(won(d.pay), '수업 결보강비 합계') + tile(d.reach + '명', '성과급 연동 기준 도달') : ''}</div>
     <h3 class="h4">월별 투입 건수</h3>${bars}
     <div class="row2"><div><h3 class="h4">자리별 투입 연인원</h3><table class="tm-tbl"><tbody>${t.slots.map((s, i) => `<tr><th scope="row"><span class="tm-badge tm-${s.k}">${i + 1}</span> ${esc(s.name)}</th><td>${d.bySlot[s.k] || 0}명</td></tr>`).join('')}</tbody></table></div>
     <div><h3 class="h4">위험 수준</h3><table class="tm-tbl"><tbody>${RISKS.map(([v, l]) => `<tr><th scope="row">${v ? l : '적지 않음'}</th><td>${d.risk[v] || 0}건</td></tr>`).join('')}</tbody></table></div></div>
@@ -318,6 +365,52 @@ function reportTab() {
   return `<section class="card"><div class="bar"><div class="tm-seg" role="group" aria-label="기간">${[['sem1', '1학기'], ['sem2', '2학기'], ['year', '올해 전체']].map(([v, l]) => `<button type="button" class="${v === k ? 'on' : ''}" data-act="tm-sem" data-v="${v}" aria-pressed="${v === k}">${l}</button>`).join('')}</div><span class="grow"></span><button type="button" class="ghost" data-act="tm-report-print" data-v="${k}">한 장 인쇄</button></div>
     ${reportHtml(k)}</section>`;
 }
+
+function trainTab() {
+  const adm = isAdmin(), t = team(), ps = people();
+  const cnt = { '': 0, 초급: 0, 중급: 0, 고급: 0 }; ps.forEach((p) => { cnt[trainOf(p.id).level || ''] = (cnt[trainOf(p.id).level || ''] || 0) + 1; });
+  const where = (id) => t.slots.filter((s) => t.roster[s.k]?.p1 === id || t.roster[s.k]?.p2 === id).map((s) => s.name).join(', ');
+  const iss = gapCheck(t).issues.filter((x) => x.kind === 'train');
+  return `<section class="card"><h2 class="h3">신체적 개입 연수 이수 현황 <small class="muted">초급 ${cnt['초급']} · 중급 ${cnt['중급']} · 고급 ${cnt['고급']} · 미이수 ${cnt['']}</small></h2>
+    ${iss.length ? `<div class="alert warn" role="status"><span>${iss.map((x) => esc(x.text)).join('<br>')}</span></div>` : ''}
+    <form id="team-train-form" class="stack"><div class="tm-tbl-wrap"><table class="tm-tbl tm-train"><thead><tr><th>사람</th><th>맡은 자리</th><th>이수 등급</th><th>이수일</th></tr></thead><tbody>
+    ${ps.map((p) => { const tr = trainOf(p.id); return `<tr><th scope="row">${esc(p.name)}<small>${esc(p.title)}${isAidePerson(p.id) ? ' · 보조인력' : ''}</small></th><td><small>${esc(where(p.id)) || '-'}</small></td>
+      <td>${adm ? `<select name="lv-${esc(p.id)}" aria-label="${esc(p.name)} 이수 등급">${LEVELS.map(([v, l]) => `<option value="${v}" ${(tr.level || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>` : `<span class="${tr.level ? '' : 'warn-t'}">${esc(tr.level || '미이수')}</span>`}</td>
+      <td>${adm ? `<input type="date" name="dt-${esc(p.id)}" value="${esc(tr.date || '')}" aria-label="${esc(p.name)} 이수일">` : esc(tr.date ? fmtDate(tr.date) : '-')}</td></tr>`; }).join('')}
+    </tbody></table></div>${adm ? '<button type="submit" class="primary">이수 현황 저장</button>' : ''}</form>
+    <p class="small muted">학생 곁에서 움직이는 1자리(소통자)와 2자리(지원대피 담당)에는 연수 이수자를 두기를 권합니다. 미이수자가 들어가면 배치도·당번표·공백 점검에 표시합니다. 등급은 케어브릿지 과정(초급·중급·고급, 등급별 이론 6시간 + 실기 6시간) 기준이며, 다른 기관 연수는 이수일과 함께 해당 등급으로 적습니다.</p></section>`;
+}
+
+/* ---------- 긴급 호출 ---------- */
+export function dutyNow(date = todayStr(), hm = timeStr()) {
+  const t = team(), w = parseDate(date).getDay();
+  const p = w >= 1 && w <= 5 ? periodOf(date, hm) : null;
+  const cell = p ? t.duty?.[DAYS[w - 1][0]]?.[p.k] || {} : {};
+  return { p, who: Object.fromEntries(t.slots.map((s) => [s.k, cell[s.k] || t.roster[s.k]?.p1 || ''])) };
+}
+export function openSos(sid = '') {
+  const t = team(), { p, who } = dutyNow();
+  const rows = t.slots.map((s, i) => { const id = who[s.k]; const acc = id && member(id) && member(id).role !== 'aide'; return `<li><span class="tm-badge tm-${s.k}">${i + 1}</span> <span class="grow">${esc(s.name)} · <b>${esc(personName(id) || '비어 있음')}</b> ${id ? (acc ? '<small class="ok-t">앱 알림</small>' : '<small class="warn-t">전화·인터폰으로 부르기</small>') : ''}</span></li>`; }).join('');
+  openModal(`<form class="tm-sos-form"><h2>지원팀 긴급 호출</h2>
+    <p class="small">${p ? `지금 ${esc(p.label)} 당번` : '당번표 시간이 아니라 1순위'}에게 깜박이는 알림을 보내고, 위기행동 사후 기록을 「지원팀 투입」 칸이 채워진 채로 바로 만듭니다.</p>
+    <ul class="rows">${rows}</ul>
+    <div class="row2"><label>학생<select name="sid" required><option value="">고르기</option>${S.students.map((x) => `<option value="${x.id}" ${x.id === sid ? 'selected' : ''}>${esc(x.alias)}</option>`).join('')}</select></label>
+    <label>장소<input name="place" required placeholder="예: 4-2 교실"></label></div>
+    <label>지금 상황(한 줄)<input name="what" placeholder="예: 의자를 들어 올림, 주변 학생 대피 중"></label>
+    <p class="small muted">보조인력과 앱 계정이 없는 사람은 알림을 받지 못합니다. 전화·인터폰으로 함께 부르세요. 112·119 신고가 필요하면 먼저 신고합니다.</p>
+    <div class="actions"><span class="grow"></span><button type="button" class="ghost" data-close>닫기</button><button type="submit" class="tm-sos">지금 부르기</button></div></form>`, {
+    onSubmit: async (fd) => {
+      const s2 = student(fd.get('sid')); const place = String(fd.get('place') || '').trim(), what = String(fd.get('what') || '').trim();
+      const now = timeStr(), to = Object.values(who).filter((id) => id && member(id) && member(id).role !== 'aide');
+      const nid = await S.store.create('incidents', {}, { studentId: s2.id, date: todayStr(), time: now, place, antecedent: '', behavior: what, prevent: '', restraint: false, createdBy: S.me.uid, createdAt: Date.now(), updatedBy: S.me.uid, updatedAt: Date.now(), closed: false,
+        deploy: { called: now, risk: '', sos: true, staff: t.slots.map((s) => ({ slot: s.k, who: who[s.k] || '', arrive: s.k === 's1' && who[s.k] === S.me.uid ? now : '', end: '', injury: false, injuryNote: '' })) } });
+      await sendAlert({ type: 'sos', title: `지원팀 긴급 호출 · ${place}`, text: `${s2.alias} · ${what || '위기행동'} · ${now} 호출`, to, self: false });
+      toast(`지원팀 ${to.length}명에게 알렸습니다`, { label: '사후 기록 열기', run: () => go(`#/student/${s2.id}/crisis`) });
+      return nid;
+    }
+  });
+}
+on('tm-sos', (el) => openSos(el.dataset.sid || ''));
 
 /* ---------- 사후 기록 안 「지원팀 투입」 칸 ---------- */
 export function deployFieldset(ic) {
@@ -332,7 +425,7 @@ export function deployFieldset(ic) {
       <td><select name="dpWho-${s.k}" aria-label="${esc(s.name)} 투입한 사람">${personOpts(x.who || '', '투입 없음')}</select></td>
       <td><input type="time" name="dpArr-${s.k}" value="${esc(x.arrive || '')}" aria-label="${esc(s.name)} 도착 시각"></td>
       <td><input type="time" name="dpEnd-${s.k}" value="${esc(x.end || '')}" aria-label="${esc(s.name)} 끝난 시각"></td>
-      <td><label class="chk small"><input type="checkbox" name="dpInj-${s.k}" ${x.injury ? 'checked' : ''}> 있음</label><input name="dpInjN-${s.k}" value="${esc(x.injuryNote || '')}" placeholder="부위·내용" aria-label="${esc(s.name)} 부상 내용"></td></tr>`; }).join('')}
+      <td><label class="chk small"><input type="checkbox" name="dpInj-${s.k}" ${x.injury ? 'checked' : ''}> 있음</label>${s.k === 's3' ? `<label class="small tm-hrs">보강 시수<input type="number" min="0" max="8" name="dpHrs-s3" value="${esc(x.hours ?? '')}" placeholder="자동"></label>` : ''}<input name="dpInjN-${s.k}" value="${esc(x.injuryNote || '')}" placeholder="부위·내용" aria-label="${esc(s.name)} 부상 내용"></td></tr>`; }).join('')}
     </tbody></table></div>
     <p class="small muted">투입 인력의 상태 확인과 돌아보기 참석은 「지원팀 → 교직원 회복」에서 적습니다.</p></fieldset>`;
 }
@@ -340,7 +433,7 @@ export function deployFromForm(fd, prev = {}) {
   const old = prev.deploy?.staff || [];
   const staff = team().slots.map((s) => {
     const o = old.find((x) => x.slot === s.k) || {};
-    return { ...o, slot: s.k, who: fd.get(`dpWho-${s.k}`) || '', arrive: fd.get(`dpArr-${s.k}`) || '', end: fd.get(`dpEnd-${s.k}`) || '', injury: fd.get(`dpInj-${s.k}`) === 'on', injuryNote: fd.get(`dpInjN-${s.k}`) || '' };
+    return { ...o, slot: s.k, who: fd.get(`dpWho-${s.k}`) || '', arrive: fd.get(`dpArr-${s.k}`) || '', end: fd.get(`dpEnd-${s.k}`) || '', injury: fd.get(`dpInj-${s.k}`) === 'on', injuryNote: fd.get(`dpInjN-${s.k}`) || '', ...(s.k === 's3' ? { hours: fd.get('dpHrs-s3') === '' || fd.get('dpHrs-s3') == null ? '' : Number(fd.get('dpHrs-s3')) } : {}) };
   });
   return { called: fd.get('dpCalled') || '', risk: fd.get('dpRisk') || '', staff };
 }
@@ -376,7 +469,7 @@ export function demoTeam(u) {
   }); });
   duty.wed.p3.s3 = u.cm; // 겹침 예시(소통자와 수업 대체에 같은 사람)
   duty.fri.p6.s3 = ''; // 빈 자리 예시
-  return { slots: DEFAULT_SLOTS, roster, extras: ex, periods: DEFAULT_TEAM_PERIODS, duty, rates: { base: { s1: 30000, s2: 30000, s3: 20000, s4: 15000, s5: 15000 }, per30: 10000, high: 20, crit: 50, injury: 50000, note: '시연용 가상 단가(실제 기준 아님)' } };
+  return { slots: DEFAULT_SLOTS, roster, extras: ex, periods: DEFAULT_TEAM_PERIODS, duty, training: { [u.cm]: { level: '중급', date: '2026-08-20' }, [u.t3]: { level: '초급', date: '2026-09-12' }, [u.t4]: { level: '초급', date: '2026-09-12' }, [u.a1]: { level: '초급', date: '2026-09-12' } }, rates: { kyulbo: 20000, bonusN: 2, bonusSlots: BONUS_SLOTS, note: '시연용 가상 기준(실제 기준 아님)' } };
 }
 
 /* ---------- 동작 ---------- */
@@ -413,8 +506,9 @@ on('tm-care', async (el) => {
 on('tm-csv', (el) => {
   const month = el.dataset.month, r = team().rates;
   const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const lines = [['날짜', '시각', '학생(가명)', '자리', '사람', '도착', '끝', '분', '위험 수준', '부상', '부상 내용', '자리 단가', '시간 단가', '가산%', '부상 더함', '금액'].map(q).join(',')];
-  entries(`${month}-01`, `${month}-31`).reverse().forEach(({ ic, st }) => { const p = entryPay(st, ic, r); lines.push([ic.date, ic.time, student(ic.studentId)?.alias || '', slotName(st.slot), personName(st.who), st.arrive, st.end, entryMin(st) ?? '', RISK_L[ic.deploy?.risk || ''] === '선택' ? '' : RISK_L[ic.deploy?.risk || ''], st.injury ? '있음' : '없음', st.injuryNote || '', p.base, p.time, p.pct, p.inj, p.total].map(q).join(',')); });
+  const KIND = { kyulbo: '수업 결보강비', count: '행동지원 횟수', none: '집계 제외(보조인력 등)' };
+  const lines = [['날짜', '시각', '학생(가명)', '자리', '사람', '구분', '도착', '끝', '분', '보강 시수', '결보강비', '위험 수준', '부상', '부상 내용', '연수'].map(q).join(',')];
+  entries(`${month}-01`, `${month}-31`).reverse().forEach(({ ic, st }) => { const p = entryPay(st, ic, r); lines.push([ic.date, ic.time, student(ic.studentId)?.alias || '', slotName(st.slot), personName(st.who), KIND[p.kind], st.arrive, st.end, entryMin(st) ?? '', p.kind === 'kyulbo' ? p.hours : '', p.kind === 'kyulbo' ? p.total : '', RISK_L[ic.deploy?.risk || ''] === '선택' ? '' : RISK_L[ic.deploy?.risk || ''], st.injury ? '있음' : '없음', st.injuryNote || '', trainOf(st.who).level || '미이수'].map(q).join(',')); });
   const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `지원팀_투입_${month}.csv`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
 });
@@ -426,7 +520,8 @@ function printHtml(html) {
   const done = () => { document.body.classList.remove('printing'); window.removeEventListener('afterprint', done); };
   window.addEventListener('afterprint', done); setTimeout(() => window.print(), 50);
 }
-on('tm-cert', (el) => printHtml(certHtml(el.dataset.who, el.dataset.month)));
+on('tm-cert', (el) => printHtml(el.dataset.kind === 'ev' ? evalCert(el.dataset.who, el.dataset.sem) : kyulboCert(el.dataset.who, el.dataset.month)));
+on('tm-eval-sem', (el) => { S.ui.teamEvalSem = el.dataset.v; rerender(); });
 on('tm-report-print', (el) => printHtml(reportHtml(el.dataset.v, { print: true })));
 
 document.addEventListener('submit', async (e) => {
@@ -440,14 +535,20 @@ document.addEventListener('submit', async (e) => {
   if (e.target.id === 'team-extra-form') {
     e.preventDefault(); if (!isAdmin()) return;
     const fd = new FormData(e.target);
-    const x = { id: 'x-' + Date.now().toString(36), name: String(fd.get('name')).trim(), title: String(fd.get('title') || '').trim() };
+    const x = { id: 'x-' + Date.now().toString(36), name: String(fd.get('name')).trim(), title: String(fd.get('title') || '').trim(), kind: fd.get('kind') || '' };
     if (!x.name) return;
     await saveTeam({ extras: [...team().extras, x] }); e.target.reset(); toast(`${x.name}을(를) 더했습니다`);
   }
   if (e.target.id === 'team-rate-form') {
     e.preventDefault(); if (!isAdmin()) return;
     const fd = new FormData(e.target), num = (k) => Math.max(0, Number(fd.get(k)) || 0);
-    const rates = { base: Object.fromEntries(team().slots.map((s) => [s.k, num(`base-${s.k}`)])), per30: num('per30'), high: num('high'), crit: num('crit'), injury: num('injury'), note: String(fd.get('note') || '').trim() };
-    await saveTeam({ rates }); toast('단가를 저장했습니다');
+    const rates = { kyulbo: num('kyulbo'), bonusN: num('bonusN'), bonusSlots: team().slots.filter((s) => s.k !== 's3' && fd.get(`bs-${s.k}`) === 'on').map((s) => s.k), note: String(fd.get('note') || '').trim() };
+    await saveTeam({ rates }); toast('기준을 저장했습니다');
+  }
+  if (e.target.id === 'team-train-form') {
+    e.preventDefault(); if (!isAdmin()) return;
+    const fd = new FormData(e.target);
+    const training = Object.fromEntries(people().map((p) => [p.id, { level: fd.get(`lv-${p.id}`) || '', date: fd.get(`dt-${p.id}`) || '' }]));
+    await saveTeam({ training }); toast('연수 이수 현황을 저장했습니다');
   }
 });

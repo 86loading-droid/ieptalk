@@ -71,7 +71,7 @@ export function crisisTab(s, args = []) {
       <p class="small">다음 단계: <b>${esc(nx.label)}</b> ${dday(nx.due)}</p>
     </section>`;
   }).join('');
-  return `<div class="bar"><button type="button" class="primary" data-act="ic-new" data-sid="${s.id}">사후 기록 시작</button><button type="button" class="ghost" data-act="pir-new" data-sid="${s.id}">신체적 개입 보고서 쓰기</button>
+  return `<div class="bar"><button type="button" class="primary" data-act="ic-new" data-sid="${s.id}">사후 기록 시작</button><button type="button" class="ghost" data-act="pir-new" data-sid="${s.id}">신체적 개입 보고서 쓰기</button><button type="button" class="tm-sos sm" data-act="tm-sos" data-sid="${s.id}">지원팀 긴급 호출</button>
     <span class="muted small">물리적 제지가 있었거나 팀이 함께 돌아봐야 할 위기행동 뒤에 씁니다. 처벌이 아니라 재발 방지와 지원 계획을 위한 기록입니다.</span></div>
     ${rw ? `<div class="alert warn" role="alert"><span>최근 ${rw.days}일 동안 사후 기록이 ${rw.cnt}건입니다(기준 ${rw.n}건). 행동지원계획 재검토를 권합니다.</span><button type="button" class="sm" data-act="ic-review-meet" data-sid="${s.id}">재검토 회의 예약</button></div>` : ''}
     ${flagged.length ? `<section class="card"><h2 class="h3">사후 기록이 필요한 기록 ${flagged.length}</h2><ul class="rows">${flagged.map((e) => `<li><span class="grow">${esc(fmtDate(e.date))} ${timeStr(new Date(e.at))} · 물리적 제지${e.intensity ? ` · 강도 ${INTENSITY[e.intensity]}` : ''}<small class="muted"> · 기록 ${esc(nameOf(e.createdBy))}</small></span><button type="button" class="sm primary" data-act="ic-from-ev" data-sid="${s.id}" data-eid="${e.id}">사후 기록 시작</button><button type="button" class="sm ghost" data-act="pir-new" data-sid="${s.id}" data-eid="${e.id}">보고서로 시작</button></li>`).join('')}</ul></section>` : ''}

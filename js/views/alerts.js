@@ -9,7 +9,8 @@ export const ALERT_TYPES = {
   urgent: { label: '긴급회의', cls: 'urgent' },
   call: { label: '전화 예약', cls: 'call' },
   meeting: { label: '회의 예약', cls: 'meeting' },
-  notice: { label: '공지', cls: 'notice' }
+  notice: { label: '공지', cls: 'notice' },
+  sos: { label: '지원팀 호출', cls: 'urgent' }
 };
 
 // 받는 사람에게 알림 띠를 만든다. self가 참이면 보낸 사람 자신의 화면에도 띄운다(나에게 보내기)

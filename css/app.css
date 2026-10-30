@@ -1034,3 +1034,10 @@ textarea.ig-edit { display: block; width: 100%; min-height: 18rem; resize: verti
   .tm-roster select, .tm-roster input { width: 100%; }
   .tm-lbl { display: block; font-size: .72rem; color: var(--muted); }
 }
+.tm-head { display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.tm-sos { background: var(--danger); color: #fff; border: 0; border-radius: 12px; font-weight: 700; min-height: 44px; padding: .5rem 1rem; }
+.tm-sos.sm { min-height: 36px; padding: .35rem .8rem; }
+.tm-sos:hover { filter: brightness(.95); }
+.tm-hrs { display: block; margin-top: .25rem; } .tm-hrs input { width: 5rem; }
+.tm-train td select, .tm-train td input { max-width: 11rem; }
+.tm-sos-form .rows li { gap: .4rem; }
