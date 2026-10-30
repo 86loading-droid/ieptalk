@@ -1058,3 +1058,9 @@ textarea.ig-edit { display: block; width: 100%; min-height: 18rem; resize: verti
 .tm-chip input:focus-visible + span { outline: 3px solid var(--focus); }
 .tm-sos-to li { padding: .35rem 0; }
 .tm-sos-set textarea { width: 100%; margin: .4rem 0; }
+.tm-sound { padding: .7rem 1rem; } .tm-sound .bar { align-items: center; gap: .8rem; flex-wrap: wrap; }
+.tm-switch { display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; font-weight: 700; }
+.tm-switch input { width: 2.6rem; height: 1.5rem; appearance: none; border-radius: 999px; background: var(--line); position: relative; transition: background .15s; margin: 0; }
+.tm-switch input::after { content: ''; position: absolute; top: 3px; left: 3px; width: 1.1rem; height: 1.1rem; border-radius: 50%; background: #fff; transition: left .15s; }
+.tm-switch input:checked { background: var(--danger); } .tm-switch input:checked::after { left: calc(100% - 1.1rem - 3px); }
+.tm-switch input:focus-visible { outline: 3px solid var(--focus); }

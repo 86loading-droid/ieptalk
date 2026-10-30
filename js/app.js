@@ -11,6 +11,7 @@ import * as Cal from './views/calendar.js';
 import * as Admin from './views/admin.js';
 import * as Aide from './views/aide.js';
 import * as Team from './views/team.js';
+import { ringSos } from './views/team.js';
 import { alertsBar } from './views/alerts.js';
 import './views/acadImport.js';
 import './views/observe.js';
@@ -141,7 +142,7 @@ function startGlobal() {
     st.sub('rooms', {}, (r) => { S.rooms = r.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0)); rerender(); });
     st.sub('meetings', {}, (r) => { S.meetings = r; rerender(); });
     st.sub('tasks', {}, (r) => { S.tasks = r; rerender(); });
-    st.sub('alerts', {}, (r) => { S.alerts = r; rerender(); });
+    st.sub('alerts', {}, (r) => { S.alerts = r; rerender(); ringSos(); });
     st.sub('acad', {}, (r) => { S.acad = r; rerender(); });
     st.sub('appts', {}, (r) => { S.appts = r; rerender(); });
     st.sub('incidents', {}, (r) => { S.incidents = r; rerender(); });

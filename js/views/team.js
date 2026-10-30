@@ -156,7 +156,7 @@ export function render(route) {
   const tabs = TABS.filter(([k]) => k !== 'pay' || isAdmin());
   const body = tab === 'duty' ? dutyTab() : tab === 'train' ? trainTab() : tab === 'log' ? logTab() : tab === 'pay' ? (isAdmin() ? payTab() : '<p class="muted">관리자만 볼 수 있습니다.</p>') : tab === 'care' ? careTab() : tab === 'report' ? reportTab() : mapTab();
   return `<div class="page-head tm-head"><div><h1>지원팀</h1><p class="muted">위기행동이 일어났을 때 함께 움직이는 전담 인력을 다섯 자리로 나누어 미리 정하고, 실제 투입을 기록해 보상·인사평가와 회복 지원의 근거로 씁니다.</p></div>
-    <button type="button" class="tm-sos" data-act="tm-sos">지원팀 긴급 호출</button></div>
+    <button type="button" class="tm-sos" data-act="tm-sos">지원팀 긴급 호출</button></div>${soundCard()}
   <nav class="tabs" aria-label="지원팀 메뉴">${tabs.map(([k, l]) => `<a href="#/team/${k}" class="${k === tab ? 'on' : ''}" ${k === tab ? 'aria-current="page"' : ''}>${l}</a>`).join('')}</nav>${body}`;
 }
 
@@ -449,6 +449,54 @@ async function saveDeskSos(patch) {
   await S.store.create('desks', {}, next, S.me.uid);
 }
 on('tm-sos', (el) => openSos(el.dataset.sid || ''));
+
+
+/* ---------- 긴급 호출 경보음(받는 사람 화면) ---------- */
+// 보조인력은 알림 대상이 아니므로 경보음도 울리지 않는다. 각자 지원팀 화면 「내 알림 설정」에서 끄고 켠다(desks.sosSound, 기본 켜짐).
+let actx = null, ringTimer = null;
+export function unlockAudio() { try { actx ||= new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch { /* 소리를 못 내는 브라우저 */ } }
+document.addEventListener('pointerdown', unlockAudio, { passive: true });
+document.addEventListener('keydown', unlockAudio, { passive: true });
+export const sosSoundOn = () => S.desk?.sosSound !== false;
+export function playAlarm(sec = 3) {
+  window.__iepAlarm = (window.__iepAlarm || 0) + 1;
+  try { navigator.vibrate?.([400, 150, 400, 150, 400]); } catch { /* 진동 없음 */ }
+  try {
+    unlockAudio(); if (!actx) return;
+    const t0 = actx.currentTime + 0.05, g = actx.createGain(), o = actx.createOscillator();
+    o.type = 'square'; o.connect(g); g.connect(actx.destination);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.03);
+    for (let i = 0; i < sec * 4; i++) o.frequency.setValueAtTime(i % 2 ? 660 : 990, t0 + i * 0.25);
+    g.gain.setValueAtTime(0.25, t0 + sec - 0.05); g.gain.exponentialRampToValueAtTime(0.0001, t0 + sec);
+    o.start(t0); o.stop(t0 + sec + 0.05);
+  } catch { /* 소리를 못 내는 브라우저 */ }
+}
+const RUNG_KEY = 'ieptalk-sos-rung';
+const rung = (() => { try { return new Set(JSON.parse(sessionStorage.getItem(RUNG_KEY) || '[]')); } catch { return new Set(); } })();
+const pending = () => {
+  const me = S.me?.uid;
+  if (!me || S.me.role === 'aide') return [];
+  return (S.alerts || []).filter((a) => a.type === 'sos' && (a.to || []).includes(me) && a.from !== me && !a.ack?.[me] && !a.hidden?.[me] && Date.now() - (a.at || 0) < 10 * 60e3);
+};
+// 알림 목록이 바뀔 때마다 부른다: 새 호출이면 바로 울리고, 확인을 누르기 전까지 20초마다 세 번 더 울린다.
+export function ringSos() {
+  if (!sosSoundOn()) return;
+  const fresh = pending().filter((a) => !rung.has(a.id));
+  if (!fresh.length) return;
+  fresh.forEach((a) => rung.add(a.id));
+  try { sessionStorage.setItem(RUNG_KEY, JSON.stringify([...rung].slice(-50))); } catch { /* 저장 안 됨 */ }
+  playAlarm();
+  clearInterval(ringTimer); let n = 0;
+  ringTimer = setInterval(() => { if (++n > 3 || !pending().length || !sosSoundOn()) { clearInterval(ringTimer); return; } playAlarm(); }, 20000);
+}
+export function soundCard() {
+  const on = sosSoundOn();
+  return `<section class="card tm-sound"><div class="bar"><div class="grow"><b>내 알림 설정</b><br><small class="muted">지원팀 긴급 호출을 받으면 경보음과 진동이 울립니다(확인을 누를 때까지 20초마다 최대 세 번 더). 이 기기와 계정에만 적용됩니다.</small></div>
+    <label class="tm-switch"><input type="checkbox" data-change="tm-sound" ${on ? 'checked' : ''}><span>경보음 ${on ? '켜짐' : '꺼짐'}</span></label>
+    <button type="button" class="ghost sm" data-act="tm-sound-test">소리 시험</button></div></section>`;
+}
+on('tm-sound', async (el) => { await saveDeskSos({ sosSound: el.checked }); if (!el.checked) clearInterval(ringTimer); toast(el.checked ? '긴급 호출 경보음을 켰습니다' : '긴급 호출 경보음을 껐습니다'); rerender(); });
+on('tm-sound-test', () => { unlockAudio(); playAlarm(2); });
 
 /* ---------- 사후 기록 안 「지원팀 투입」 칸 ---------- */
 export function deployFieldset(ic) {

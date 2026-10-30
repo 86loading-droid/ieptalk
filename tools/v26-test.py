@@ -175,6 +175,29 @@ async def main():
       box = pg.locator('input[data-f="debrief"]').first
       await box.check(); await pg.wait_for_timeout(400)
       chk(await pg.locator('input[data-f="debrief"]').first.count() >= 0, 'care save ok')
+      # 경보음: 받는 사람 화면에서 울림, 내 알림 설정에서 끄고 켬
+      await pg.goto(B + '?demo=1&as=admin#/team'); await pg.wait_for_timeout(600)
+      chk(await pg.locator('.tm-sound input[data-change="tm-sound"]').is_checked(), 'sound on by default')
+      mk = """async(t)=>{const st=await import('./js/state.js'); await st.S.store.create('alerts',{},{type:'sos',title:'지원팀 긴급 호출 · '+t,text:'',from:'u-t3',to:['u-admin'],at:Date.now(),roomId:'',meetingId:'',ack:{},hidden:{}})}"""
+      n0 = await pg.evaluate('window.__iepAlarm||0')
+      await pg.evaluate(mk, '시험1'); await pg.wait_for_timeout(600)
+      n1 = await pg.evaluate('window.__iepAlarm||0')
+      chk(n1 == n0 + 1, f'alarm rings on incoming sos {n0}->{n1}')
+      await pg.evaluate(mk, '시험1-다시렌더'); await pg.wait_for_timeout(300)
+      await pg.locator('.tm-sound input[data-change="tm-sound"]').uncheck(); await pg.wait_for_timeout(400)
+      chk('꺼짐' in await pg.inner_text('.tm-sound'), 'sound toggled off')
+      n2 = await pg.evaluate('window.__iepAlarm||0')
+      await pg.evaluate(mk, '시험2'); await pg.wait_for_timeout(600)
+      chk(await pg.evaluate('window.__iepAlarm||0') == n2, 'no alarm when off')
+      await pg.reload(); await pg.wait_for_timeout(900)
+      chk(not await pg.locator('.tm-sound input[data-change="tm-sound"]').is_checked(), 'sound setting persists')
+      await pg.locator('.tm-sound input[data-change="tm-sound"]').check(); await pg.wait_for_timeout(300)
+      n3 = await pg.evaluate('window.__iepAlarm||0')
+      await pg.click('[data-act="tm-sound-test"]'); await pg.wait_for_timeout(200)
+      chk(await pg.evaluate('window.__iepAlarm||0') == n3 + 1, 'sound test button')
+      # 가져오기 지도: 화면 파일이 판 번호로 불림
+      vers = await pg.evaluate("performance.getEntriesByType('resource').filter(e=>e.name.includes('/js/views/team.js')).map(e=>e.name.split('?')[1]||'')")
+      chk(len(vers) > 0 and all(x.startswith('v=') for x in vers), f'views loaded with version {vers}')
       # 보고
       await pg.goto(B + '?demo=1&as=admin#/team/report'); await pg.wait_for_timeout(600)
       await pg.click('[data-act="tm-sem"][data-v="year"]'); await pg.wait_for_timeout(300)
